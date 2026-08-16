@@ -5,6 +5,7 @@ import com.example.userservice.exception.UserNotFoundException;
 import com.example.userservice.model.User;
 import com.example.userservice.model.UserRole;
 import com.example.userservice.repository.UserRepository;
+import com.example.userservice.security.PasswordService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,9 +15,11 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordService passwordService;
     
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordService passwordService) {
         this.userRepository = userRepository;
+        this.passwordService = passwordService;
     }
 
     public List<User> getAllUsers() {
@@ -43,10 +46,11 @@ public class UserService {
         if (user.getRole() == null) {
             user.setRole(UserRole.PATIENT);
         }
+        user.setPassword(passwordService.hash(user.getPassword()));
         return userRepository.save(user);
     }
 
-    public User updateUser(UUID id, User updatedUser) {
+    public User updateUser(UUID id, User updatedUser, boolean allowRoleChange) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
@@ -57,7 +61,7 @@ public class UserService {
         user.setName(updatedUser.getName());
         user.setEmail(updatedUser.getEmail());
         user.setPhone(updatedUser.getPhone());
-        if (updatedUser.getRole() != null) {
+        if (allowRoleChange && updatedUser.getRole() != null) {
             user.setRole(updatedUser.getRole());
         }
 

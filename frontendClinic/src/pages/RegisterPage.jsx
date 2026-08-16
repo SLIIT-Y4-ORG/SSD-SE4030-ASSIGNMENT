@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
 
-const ROLES = ['PATIENT', 'DOCTOR', 'RECEPTIONIST', 'ADMIN']
-
 export default function RegisterPage() {
     const { register } = useAuth()
     const toast = useToast()
@@ -14,7 +12,6 @@ export default function RegisterPage() {
         email: '',
         password: '',
         phoneNumber: '',
-        role: 'PATIENT',
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -112,15 +109,6 @@ export default function RegisterPage() {
                                 onChange={handleChange}
                                 required
                             />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="role">Role</label>
-                            <select id="role" name="role" value={form.role} onChange={handleChange}>
-                                {ROLES.map(r => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
                         </div>
 
                         <button

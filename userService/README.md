@@ -2,7 +2,7 @@
 
 Spring Boot microservice for user management. Part of a polyrepo microservices setup.
 
-> **Polyrepo**: This service lives in its own Git repository and is independently built, tested, and deployed.
+This service is maintained as part of the ClinicMate root repository.
 
 ## API
 
@@ -10,11 +10,11 @@ Base URL (local): `http://localhost:8081`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/users` | List all users |
-| `GET` | `/api/users/{id}` | Get user by ID |
-| `POST` | `/api/users` | Create a user |
-| `PUT` | `/api/users/{id}` | Update a user |
-| `DELETE` | `/api/users/{id}` | Delete a user |
+| `GET` | `/api/users` | List all users (admin) |
+| `GET` | `/api/users/{id}` | Get own user or any user (admin) |
+| `POST` | `/api/users` | Create a user (admin) |
+| `PUT` | `/api/users/{id}` | Update own user or any user (admin) |
+| `DELETE` | `/api/users/{id}` | Delete own user or any user (admin) |
 | `GET` | `/actuator/health` | Health check |
 
 **Create / Update payload:**
@@ -59,6 +59,7 @@ gcloud builds submit --config=cloudbuild.yaml --project YOUR_PROJECT_ID .
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | HTTP port (set automatically by Cloud Run) |
+| `SECURITY_TOKEN_SECRET` | none (required) | Random token-signing secret of at least 32 characters |
 
 ## Tech Stack
 
