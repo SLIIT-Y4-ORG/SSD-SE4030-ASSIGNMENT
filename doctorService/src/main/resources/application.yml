@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: doctor-service
+
+  datasource:
+    # Same Supabase PostgreSQL instance as user-service — tables live in the
+    # "doctor" schema (Hibernate default_schema below handles all qualification).
+    # prepareThreshold=0  → disables server-side prepared statements (PgBouncer)
+    # sslmode=require     → Supabase enforces SSL
+    url: ${DB_URL:jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres?prepareThreshold=0&sslmode=require}
+    username: ${DB_USERNAME:postgres.bdgicssvyfumdnddxzbc}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # All tables are created / queried inside the "doctor" schema.
+        # Hibernate generates fully-qualified SQL (e.g. SELECT * FROM doctor.doctors)
+        # so this works safely with PgBouncer transaction-mode pooling.
+        default_schema: doctor
+        format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+  sql:
+    init:
+      # Creates the "doctor" schema before Hibernate DDL runs.
+      # schema.sql runs once at startup; it is idempotent (IF NOT EXISTS).
+      mode: always
+      schema-locations: classpath:schema.sql
+
+# URL of the user-service — used by UserServiceClient to validate JWT tokens.
+# Override at runtime via USER_SERVICE_URL env variable (Cloud Run / Docker).
+user-service:
+  url: ${USER_SERVICE_URL:http://localhost:8081}
+
+server:
+  port: ${PORT:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.example.doctorservice: DEBUG
+    org.springframework.web: DEBUG

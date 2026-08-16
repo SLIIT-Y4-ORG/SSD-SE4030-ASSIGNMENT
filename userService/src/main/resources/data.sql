@@ -1,0 +1,1 @@
+-- Data seeding disabled. Users are created via POST /api/auth/register (Supabase Auth + local mirror).

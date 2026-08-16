@@ -1,0 +1,259 @@
+package com.example.userservice.service;
+
+import com.example.userservice.dto.TokenValidationResponse;
+import com.example.userservice.model.*;
+import com.example.userservice.exception.AuthRegistrationException;
+import com.example.userservice.exception.DuplicateEmailException;
+import com.example.userservice.exception.UserNotFoundException;
+import com.example.userservice.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AuthServiceImpl implements AuthService {
+
+    private final UserRepository userRepository;
+    private final RestTemplate restTemplate;
+
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.service-role-key}")
+    private String supabaseServiceRoleKey;
+
+    // register
+    @Override
+    @Transactional
+    public User registerUser(User request) {
+        log.info("Registering user with email: {}", request.getEmail());
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateEmailException(request.getEmail());
+        }
+
+        // 1. Create user in Supabase Auth (Admin API — email auto-confirmed)
+        Map<String, Object> supabaseRequest = new HashMap<>();
+        supabaseRequest.put("email", request.getEmail());
+        supabaseRequest.put("password", request.getPassword());
+        supabaseRequest.put("email_confirm", true);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(supabaseRequest, adminHeaders());
+        String url = supabaseUrl + "/auth/v1/admin/users";
+
+        try {
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url, HttpMethod.POST, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+
+            Map<String, Object> body = response.getBody();
+            if (!response.getStatusCode().is2xxSuccessful() || body == null || body.get("id") == null) {
+                throw new AuthRegistrationException(
+                        "Supabase registration failed. Status: " + response.getStatusCode());
+            }
+
+            UUID supabaseUserId = UUID.fromString(body.get("id").toString());
+
+            // 2. Mirror the user in our local Supabase PostgreSQL DB
+            User user = User.builder()
+                    .id(supabaseUserId)
+                    .email(request.getEmail())
+                    .name(request.getName())
+                    .phone(request.getPhone())
+                    .role(request.getRole())
+                    .enabled(true)
+                    .build();
+
+            return userRepository.save(user);
+
+        } catch (DuplicateEmailException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Supabase registration error: ", e);
+            throw new AuthRegistrationException("Supabase registration error: " + e.getMessage(), e);
+        }
+    }
+
+    // login
+    @Override
+    public AuthResponse loginUser(LoginRequest request) {
+        log.info("Login attempt for email: {}", request.getEmail());
+
+        Map<String, Object> loginBody = new HashMap<>();
+        loginBody.put("email", request.getEmail());
+        loginBody.put("password", request.getPassword());
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(loginBody, adminHeaders());
+        String url = supabaseUrl + "/auth/v1/token?grant_type=password";
+
+        try {
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url, HttpMethod.POST, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+
+            Map<String, Object> body = response.getBody();
+            if (body == null || body.get("access_token") == null) {
+                throw new AuthRegistrationException("Login failed: invalid credentials");
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> supabaseUser = (Map<String, Object>) body.get("user");
+            UUID userId = UUID.fromString((String) supabaseUser.get("id"));
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException(userId));
+
+            return new AuthResponse(
+                    (String) body.get("access_token"),
+                    (String) body.get("refresh_token"),
+                    (String) body.get("token_type"),
+                    (Integer) body.get("expires_in"),
+                    user
+            );
+
+        } catch (AuthRegistrationException | UserNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Login error: ", e);
+            throw new AuthRegistrationException("Login failed: " + e.getMessage(), e);
+        }
+    }
+
+    // logout
+    @Override
+    public void logoutUser(String accessToken) {
+        log.info("Logging out user");
+
+        HttpHeaders headers = adminHeaders();
+        headers.setBearerAuth(accessToken);   
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            restTemplate.exchange(
+                    supabaseUrl + "/auth/v1/logout?scope=local",
+                    HttpMethod.POST, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.debug("Logout completed (response: {})", e.getMessage());
+        }
+    }
+
+    // refresh token
+    @Override
+    public AuthResponse refreshToken(String refreshToken) {
+        log.info("Refreshing access token");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("refresh_token", refreshToken);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, adminHeaders());
+        String url = supabaseUrl + "/auth/v1/token?grant_type=refresh_token";
+
+        try {
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url, HttpMethod.POST, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+
+            Map<String, Object> resp = response.getBody();
+            if (resp == null || resp.get("access_token") == null) {
+                throw new AuthRegistrationException("Token refresh failed: invalid refresh token");
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> supabaseUser = (Map<String, Object>) resp.get("user");
+            UUID userId = UUID.fromString((String) supabaseUser.get("id"));
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException(userId));
+
+            return new AuthResponse(
+                    (String) resp.get("access_token"),
+                    (String) resp.get("refresh_token"),
+                    (String) resp.get("token_type"),
+                    (Integer) resp.get("expires_in"),
+                    user
+            );
+
+        } catch (AuthRegistrationException | UserNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Token refresh error: ", e);
+            throw new AuthRegistrationException("Token refresh failed: " + e.getMessage(), e);
+        }
+    }
+
+    // get current user
+    @Override
+    public User getCurrentUser(String accessToken) {
+        TokenValidationResponse validation = validateToken(accessToken);
+        if (!validation.isValid()) {
+            throw new AuthRegistrationException("Invalid or expired token");
+        }
+        User user = userRepository.findById(validation.getUserId())
+                .orElseThrow(() -> new UserNotFoundException(validation.getUserId()));
+        return user;
+    }
+
+    // validate token
+    @Override
+    public TokenValidationResponse validateToken(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", supabaseServiceRoleKey);
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    supabaseUrl + "/auth/v1/user",
+                    HttpMethod.GET, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+
+            Map<String, Object> body = response.getBody();
+            if (body == null || body.get("id") == null) {
+                return invalid("Token returned no user");
+            }
+
+            UUID userId = UUID.fromString((String) body.get("id"));
+            String email  = (String) body.get("email");
+
+            User user = userRepository.findById(userId).orElse(null);
+            UserRole role = user != null ? user.getRole() : null;
+
+            return TokenValidationResponse.builder()
+                    .valid(true)
+                    .userId(userId)
+                    .email(email)
+                    .role(role)
+                    .build();
+
+        } catch (Exception e) {
+            log.warn("Token validation failed: {}", e.getMessage());
+            return invalid("Token validation failed: " + e.getMessage());
+        }
+    }
+
+    // Helpers
+    private HttpHeaders adminHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", supabaseServiceRoleKey);
+        headers.setBearerAuth(supabaseServiceRoleKey);
+        return headers;
+    }
+
+    private TokenValidationResponse invalid(String message) {
+        return TokenValidationResponse.builder().valid(false).message(message).build();
+    }
+}

@@ -1,0 +1,59 @@
+steps:
+  # ─── 1. Build image ───────────────────────────────────────────────────────
+  - name: "gcr.io/cloud-builders/docker"
+    id: "build"
+    args:
+      - "build"
+      - "-t"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/doctor-service/app:$COMMIT_SHA"
+      - "-t"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/doctor-service/app:latest"
+      - "."
+
+  # ─── 2. Push image ────────────────────────────────────────────────────────
+  - name: "gcr.io/cloud-builders/docker"
+    id: "push"
+    waitFor: ["build"]
+    args:
+      - "push"
+      - "--all-tags"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/doctor-service/app"
+
+  # ─── 3. Deploy to Cloud Run ───────────────────────────────────────────────
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "deploy"
+    waitFor: ["push"]
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "doctor-service"
+      - "--image"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/doctor-service/app:$COMMIT_SHA"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8080"
+      - "--memory"
+      - "512Mi"
+      - "--cpu"
+      - "1"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "5"
+      - "--set-env-vars"
+      - "DB_URL=jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres?prepareThreshold=0&sslmode=require,DB_USERNAME=postgres.bdgicssvyfumdnddxzbc,SUPABASE_URL=https://bdgicssvyfumdnddxzbc.supabase.co,USER_SERVICE_URL=https://user-service-268672367192.us-central1.run.app"
+      - "--update-secrets"
+      - "DB_PASSWORD=user-service-db-password:latest"
+
+images:
+  - "us-central1-docker.pkg.dev/$PROJECT_ID/doctor-service/app:$COMMIT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: "900s"

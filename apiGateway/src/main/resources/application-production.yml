@@ -1,0 +1,55 @@
+# Production Profile for Cloud Deployment
+spring:
+  config:
+    activate:
+      on-profile: prod
+  cloud:
+    gateway:
+      routes:
+        - id: user-service-prod
+          uri: https://user-service-268672367192.us-central1.run.app
+          predicates:
+            - Path=/api/auth/**, /api/users/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+            
+        - id: doctor-service-prod
+          uri: https://doctor-service-efc3c5f3xa-uc.a.run.app
+          predicates:
+            - Path=/api/doctors/**, /api/slots/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+
+        - id: payment-service-prod
+          uri: ${PAYMENT_SERVICE_URL:http://payment-service:8085}
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+
+      # Global CORS configuration
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "https://clinicsliitmicroservice.netlify.app"
+              - "http://localhost:3000"
+              - "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: INFO
+    root: INFO
+    
+server:
+  port: ${PORT:8080}

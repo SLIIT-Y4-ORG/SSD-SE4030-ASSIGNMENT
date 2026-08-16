@@ -1,0 +1,88 @@
+# server:
+#   port: 8084
+
+# spring:
+#   application:
+#     name: appointmentservice
+
+#   datasource:
+#     url: jdbc:postgresql://localhost:5432/appointmentdb
+#     username: postgres
+#     password: postgres
+#     driver-class-name: org.postgresql.Driver
+
+#   jpa:
+#     hibernate:
+#       ddl-auto: update
+#     show-sql: true
+#     properties:
+#       hibernate:
+#         format_sql: true
+#         default_schema: appointment
+
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: appointmentservice
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/appointmentdb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari: # Using HikariCP for better performance
+      maximum-pool-size: 5 # Added for stability
+      connection-timeout: 20000 # Added for stability
+
+  jpa:
+    hibernate:
+      # Use 'update' for dev/test, 'validate' for production
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        default_schema: appointment # Ensure this matches your DB setup
+        format_sql: true # Optional, for better readability in logs
+
+  sql:
+    init:
+      # Change to 'never' to let Hibernate (ddl-auto) manage the tables
+      mode: ${SPRING_SQL_INIT_MODE:always} # Ensures schema.sql and data.sql are always executed if this is 'always'
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+services:
+  patient:
+    base-url: ${PATIENT_SERVICE_URL:http://localhost:8082}
+  doctor:
+    base-url: ${DOCTOR_SERVICE_URL:http://localhost:8083}
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+  payment:
+    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8080}
+    internal-api-key: ${PAYMENT_INTERNAL_API_KEY:c2tfaW50ZXJuYWFsX2I0YzI1N2Y4YThiNGQ1OGM5YzMxNWM0NWU3YWY1MzdkCg==}
+
+# services:
+  # patient:
+  #   base-url: http://localhost:8082
+  # doctor:
+  #   base-url: http://localhost:8083
+  # user:
+  #   base-url: http://localhost:8081
+#   patient:
+#     base-url: ${PATIENT_SERVICE_URL:http://localhost:8082}
+#   doctor:
+#     base-url: ${DOCTOR_SERVICE_URL:http://localhost:8083}
+#   user:
+#     base-url: ${USER_SERVICE_URL:http://localhost:8081}
+#   payment:
+#     base-url: ${PAYMENT_SERVICE_URL:http://localhost:8085}
+    # payment:
+    #   base-url: ${PAYMENT_SERVICE_URL:http://localhost:8080}
+    #   internal-api-key: ${PAYMENT_INTERNAL_API_KEY:c2tfaW50ZXJuYWFsX2I0YzI1N2Y4YThiNGQ1OGM5YzMxNWM0NWU3YWY1MzdkCg==}

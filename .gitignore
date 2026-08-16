@@ -1,0 +1,48 @@
+# Java / Maven
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.pid
+.mvn/
+mvnw
+mvnw.cmd
+HELP.md
+
+# Spring Tool Suite / Eclipse
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# Node / frontend builds
+node_modules/
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editors and operating systems
+.vscode/
+.DS_Store
+Thumbs.db

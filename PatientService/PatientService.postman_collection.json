@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "Patient Service",
+    "description": "Postman collection for testing the PatientService microservice.\n\nSet the `baseUrl` variable to `http://localhost:8080` for local or your Choreo URL for production.\nSet `token` after logging in via user-service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",    "value": "http://localhost:8080",  "type": "string" },
+    { "key": "token",      "value": "",                       "type": "string" },
+    { "key": "patientId",  "value": "",                       "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check (custom)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Simple health endpoint returning service status."
+          }
+        },
+        {
+          "name": "Actuator Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/health",
+            "description": "Spring Boot actuator health endpoint."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patients",
+      "item": [
+        {
+          "name": "Create Patient Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) { pm.collectionVariables.set('patientId', json.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/patients",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"phone\": \"+94771234567\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"Male\",\n  \"address\": \"123 Main St, Colombo\",\n  \"bloodGroup\": \"O+\",\n  \"allergies\": \"Penicillin\"\n}"
+            },
+            "description": "Creates a patient profile linked to the authenticated user. Saves patientId to collection variable."
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/patients/me",
+            "description": "Returns the patient profile of the currently authenticated user."
+          }
+        },
+        {
+          "name": "Get All Patients (Admin/Receptionist)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/patients",
+            "description": "Returns all patients. Requires ADMIN or RECEPTIONIST role."
+          }
+        },
+        {
+          "name": "Get Patient by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}",
+            "description": "Returns a single patient by their UUID."
+          }
+        },
+        {
+          "name": "Update Patient Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+94779876543\",\n  \"address\": \"456 New Street, Kandy\",\n  \"allergies\": \"Penicillin, Aspirin\"\n}"
+            },
+            "description": "Updates a patient profile. Only the patient themselves, ADMIN, or RECEPTIONIST can update."
+          }
+        }
+      ]
+  ]
+}

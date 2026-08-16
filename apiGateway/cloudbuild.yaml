@@ -1,0 +1,26 @@
+steps:
+  # Build Docker image with multi-stage build
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/api-gateway', '.']
+    
+  # Push Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/api-gateway']
+    
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: [
+      'run', 'deploy', 'api-gateway',
+      '--image=gcr.io/$PROJECT_ID/api-gateway',
+      '--platform=managed', 
+      '--region=us-central1',
+      '--allow-unauthenticated',
+      '--set-env-vars=SPRING_PROFILES_ACTIVE=production',
+      '--set-env-vars=USER_SERVICE_URL=https://user-service-268672367192.us-central1.run.app',
+      '--set-env-vars=DOCTOR_SERVICE_URL=https://doctor-service-efc3c5f3xa-uc.a.run.app',
+      '--set-env-vars=PORT=8080'
+    ]
+
+options:
+  logging: CLOUD_LOGGING_ONLY

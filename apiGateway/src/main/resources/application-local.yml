@@ -1,0 +1,24 @@
+# Local Development Profile
+spring:
+  profiles: local
+  cloud:
+    gateway:
+      routes:
+        - id: user-service-local
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/auth/**, /api/users/**
+            
+        - id: doctor-service-local
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/doctors/**, /api/slots/**
+
+        - id: payment-service-local
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/payments/**
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG

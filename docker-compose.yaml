@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  user-service:
+    image: user-service:local
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./userService/.env
+  doctor-service:
+    image: doctor-service:local
+    ports:
+      - "8082:8082"
+    env_file:
+      - ./doctorService/.env
+    depends_on:
+      - user-service
+
+  api-gateway:
+    image: api-gateway:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./apiGateway/.env
+    depends_on:
+      - user-service
+      - doctor-service
