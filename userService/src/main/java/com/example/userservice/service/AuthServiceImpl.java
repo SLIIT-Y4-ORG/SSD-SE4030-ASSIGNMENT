@@ -5,6 +5,9 @@ import com.example.userservice.model.*;
 import com.example.userservice.exception.AuthRegistrationException;
 import com.example.userservice.exception.UserNotFoundException;
 import com.example.userservice.repository.UserRepository;
+import com.example.userservice.security.PasswordService;
+import com.example.userservice.security.TokenService;
+import com.example.userservice.security.TokenService.TokenType;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -13,9 +16,13 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final PasswordService passwordService;
+    private final TokenService tokenService;
 
-    public AuthServiceImpl(UserRepository userRepository) {
+    public AuthServiceImpl(UserRepository userRepository, PasswordService passwordService, TokenService tokenService) {
         this.userRepository = userRepository;
+        this.passwordService = passwordService;
+        this.tokenService = tokenService;
     }
 
     @Override
@@ -24,10 +31,10 @@ public class AuthServiceImpl implements AuthService {
             throw new AuthRegistrationException("User with email already exists");
         }
         
-        if (user.getId() == null) {
-            user.setId(UUID.randomUUID());
-        }
-        
+        // Public registration must never accept identity or privilege fields from the client.
+        user.setId(UUID.randomUUID());
+        user.setRole(UserRole.PATIENT);
+        user.setPassword(passwordService.hash(user.getPassword()));
         return userRepository.save(user);
     }
 
@@ -36,16 +43,16 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
         
-        // Simple password check (in real app, you'd hash/verify properly)
-        if (!request.getPassword().equals(user.getPassword())) {
+        if (!passwordService.matches(request.getPassword(), user.getPassword())) {
             throw new AuthRegistrationException("Invalid credentials");
         }
-        
-        // Generate simple token (in real app, use JWT)
-        String token = "token_" + user.getId().toString();
+
+        String token = tokenService.issue(user.getId(), TokenType.ACCESS);
+        String refreshToken = tokenService.issue(user.getId(), TokenType.REFRESH);
         
         AuthResponse response = new AuthResponse();
         response.setAccessToken(token);
+        response.setRefreshToken(refreshToken);
         response.setTokenType("Bearer");
         response.setExpiresIn(3600);
         response.setUser(user);
@@ -60,25 +67,23 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse refreshToken(String refreshToken) {
-        // Simple refresh - return same token
+        UUID userId = tokenService.verify(refreshToken, TokenType.REFRESH);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
         AuthResponse response = new AuthResponse();
-        response.setAccessToken(refreshToken);
+        response.setAccessToken(tokenService.issue(userId, TokenType.ACCESS));
+        response.setRefreshToken(tokenService.issue(userId, TokenType.REFRESH));
         response.setTokenType("Bearer");
         response.setExpiresIn(3600);
-        
+        response.setUser(user);
         return response;
     }
 
     @Override
     public User getCurrentUser(String accessToken) {
-        // Extract user ID from simple token format
-        if (accessToken.startsWith("token_")) {
-            String userIdStr = accessToken.substring(6);
-            UUID userId = UUID.fromString(userIdStr);
-            return userRepository.findById(userId)
-                    .orElseThrow(() -> new UserNotFoundException(userId));
-        }
-        throw new AuthRegistrationException("Invalid token");
+        UUID userId = tokenService.verify(accessToken, TokenType.ACCESS);
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 
     @Override
