@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,50 @@ public class DoctorServiceImpl implements DoctorService {
         if (doctorRepository.existsByEmail(doctor.getEmail())) {
             throw new DuplicateDoctorEmailException(doctor.getEmail());
         }
+        doctor.setId(null);
+        doctor.setVerified(false);
+        doctor.setActive(false);
+        return doctorRepository.save(doctor);
+    }
+
+    @Override
+    @Transactional
+    public Doctor createApplication(Doctor doctor) {
+        if (doctorRepository.existsByUserId(doctor.getUserId())) {
+            throw new IllegalStateException("A doctor application already exists for this account");
+        }
+        if (doctorRepository.existsByEmail(doctor.getEmail())) {
+            throw new DuplicateDoctorEmailException(doctor.getEmail());
+        }
+        if (doctorRepository.existsByLicenseNumber(doctor.getLicenseNumber())) {
+            throw new IllegalStateException("A doctor application already exists for this license number");
+        }
+        doctor.setId(null);
+        doctor.setVerified(false);
+        doctor.setActive(false);
+        return doctorRepository.save(doctor);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Doctor> getApplicationByUserId(UUID userId) {
+        return doctorRepository.findByUserId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Doctor> getPendingApplications() {
+        return doctorRepository.findByVerifiedFalseOrderByCreatedAtAsc();
+    }
+
+    @Override
+    @Transactional
+    public Doctor approveApplication(UUID id) {
+        Doctor doctor = doctorRepository.findById(id).orElseThrow(() -> new DoctorNotFoundException(id));
+        if (doctor.getUserId() == null) {
+            throw new IllegalStateException("Doctor application is not linked to a user account");
+        }
+        doctor.setVerified(true);
         doctor.setActive(true);
         return doctorRepository.save(doctor);
     }
@@ -42,11 +87,11 @@ public class DoctorServiceImpl implements DoctorService {
     @Transactional(readOnly = true)
     public List<Doctor> getAllDoctors(String specialization, String department) {
         if (specialization != null && !specialization.isBlank()) {
-            return doctorRepository.findBySpecializationIgnoreCase(specialization);
+            return doctorRepository.findByVerifiedTrueAndIsActiveTrueAndSpecializationIgnoreCase(specialization);
         } else if (department != null && !department.isBlank()) {
-            return doctorRepository.findByDepartmentIgnoreCase(department);
+            return doctorRepository.findByVerifiedTrueAndIsActiveTrueAndDepartmentIgnoreCase(department);
         } else {
-            return doctorRepository.findAll();
+            return doctorRepository.findByVerifiedTrueAndIsActiveTrue();
         }
     }
 
@@ -94,7 +139,6 @@ public class DoctorServiceImpl implements DoctorService {
         if (doctorRequest.getLicenseNumber() != null) doctor.setLicenseNumber(doctorRequest.getLicenseNumber());
         if (doctorRequest.getDepartment() != null) doctor.setDepartment(doctorRequest.getDepartment());
         doctor.setYearsOfExperience(doctorRequest.getYearsOfExperience());
-        doctor.setVerified(doctorRequest.isVerified());
         return doctorRepository.save(doctor);
     }
 
@@ -103,6 +147,7 @@ public class DoctorServiceImpl implements DoctorService {
     public Doctor verifyDoctor(UUID id, boolean verified) {
         Doctor doctor = doctorRepository.findById(id).orElseThrow(() -> new DoctorNotFoundException(id));
         doctor.setVerified(verified);
+        doctor.setActive(verified);
         return doctorRepository.save(doctor);
     }
 
@@ -110,6 +155,9 @@ public class DoctorServiceImpl implements DoctorService {
     @Transactional(readOnly = true)
     public Doctor getAvailableSlotsForAppointment(UUID doctorId, LocalDate date) {
         Doctor doctor = doctorRepository.findById(doctorId).orElseThrow(() -> new DoctorNotFoundException(doctorId));
+        if (!doctor.isVerified() || !doctor.isActive()) {
+            throw new DoctorNotFoundException(doctorId);
+        }
         LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
         List<DoctorSlot> availableSlots = slotRepository.findAvailableByDoctorAndDate(doctorId, effectiveDate);
         doctor.setSlots(availableSlots);
