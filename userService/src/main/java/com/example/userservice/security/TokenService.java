@@ -1,6 +1,7 @@
 package com.example.userservice.security;
 
 import com.example.userservice.exception.AuthRegistrationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,7 @@ public class TokenService {
     private final byte[] secret;
     private final Clock clock;
 
+    @Autowired
     public TokenService(@Value("${security.token-secret}") String secret) {
         this(secret, Clock.systemUTC());
     }
@@ -32,16 +34,20 @@ public class TokenService {
         this.clock = clock;
     }
 
-    public String issue(UUID userId, TokenType type) {
+    public String issue(UUID userId, TokenType type, long version) {
         long lifetime = type == TokenType.ACCESS ? 3600 : 604800;
-        String payload = userId + ":" + Instant.now(clock).plusSeconds(lifetime).getEpochSecond() + ":" + type;
+        String payload = userId + ":" + Instant.now(clock).plusSeconds(lifetime).getEpochSecond()
+                + ":" + type + ":" + version;
         String encoded = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
         return encoded + "." + sign(encoded);
     }
 
-    public UUID verify(String token, TokenType requiredType) {
+    public TokenClaims verify(String token, TokenType requiredType) {
         try {
+            if (token == null || token.isBlank() || token.length() > 2048) {
+                throw invalidToken();
+            }
             String[] parts = token.split("\\.");
             if (parts.length != 2 || !MessageDigest.isEqual(
                     sign(parts[0]).getBytes(StandardCharsets.UTF_8), parts[1].getBytes(StandardCharsets.UTF_8))) {
@@ -49,11 +55,15 @@ public class TokenService {
             }
             String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
             String[] claims = payload.split(":");
-            if (claims.length != 3 || !requiredType.name().equals(claims[2])
+            if (claims.length != 4 || !requiredType.name().equals(claims[2])
                     || Instant.now(clock).getEpochSecond() >= Long.parseLong(claims[1])) {
                 throw invalidToken();
             }
-            return UUID.fromString(claims[0]);
+            long version = Long.parseLong(claims[3]);
+            if (version < 0) {
+                throw invalidToken();
+            }
+            return new TokenClaims(UUID.fromString(claims[0]), version);
         } catch (AuthRegistrationException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -77,4 +87,6 @@ public class TokenService {
     }
 
     public enum TokenType { ACCESS, REFRESH }
+
+    public record TokenClaims(UUID userId, long version) {}
 }

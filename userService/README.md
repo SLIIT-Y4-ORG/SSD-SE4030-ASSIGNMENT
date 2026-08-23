@@ -14,6 +14,7 @@ Base URL (local): `http://localhost:8081`
 | `GET` | `/api/users/{id}` | Get own user or any user (admin) |
 | `POST` | `/api/users` | Create a user (admin) |
 | `PUT` | `/api/users/{id}` | Update own user or any user (admin) |
+| `PATCH` | `/api/users/{id}/role` | Assign a role (admin only) |
 | `DELETE` | `/api/users/{id}` | Delete own user or any user (admin) |
 | `GET` | `/actuator/health` | Health check |
 
@@ -60,6 +61,18 @@ gcloud builds submit --config=cloudbuild.yaml --project YOUR_PROJECT_ID .
 |---|---|---|
 | `PORT` | `8080` | HTTP port (set automatically by Cloud Run) |
 | `SECURITY_TOKEN_SECRET` | none (required) | Random token-signing secret of at least 32 characters |
+| `BOOTSTRAP_ADMIN_EMAIL` | empty | Optional initial administrator email |
+| `BOOTSTRAP_ADMIN_PASSWORD` | empty | Optional initial administrator password (minimum 12 characters) |
+| `BOOTSTRAP_ADMIN_NAME` | `System Administrator` | Initial administrator display name |
+
+## Security behavior
+
+- Public registration always creates an enabled `PATIENT`; identity and privilege fields are assigned server-side.
+- New passwords are PBKDF2-HMAC-SHA-256 hashes with 600,000 iterations and unique salts.
+- Access tokens expire after one hour; rotating refresh tokens expire after seven days.
+- Logout persistently revokes previously issued access and refresh tokens.
+- User records are owner-or-admin; user listing, account creation, and role assignment are admin-only.
+- Profile updates cannot change roles or account security state, and the final administrator cannot be removed.
 
 ## Tech Stack
 

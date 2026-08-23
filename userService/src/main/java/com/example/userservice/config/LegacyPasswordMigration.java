@@ -5,6 +5,8 @@ import com.example.userservice.security.PasswordService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 public class LegacyPasswordMigration implements CommandLineRunner {
     private final UserRepository userRepository;
@@ -21,7 +23,15 @@ public class LegacyPasswordMigration implements CommandLineRunner {
         userRepository.findAll().stream()
                 .filter(user -> user.getPassword() != null && !passwordService.isHash(user.getPassword()))
                 .forEach(user -> {
-                    user.setPassword(passwordService.hash(user.getPassword()));
+                    String legacyPassword = user.getPassword();
+                    if (legacyPassword.isEmpty() || legacyPassword.length() > 128) {
+                        // Remove unusable plaintext while requiring an administrator-led
+                        // password recovery before this account can authenticate again.
+                        user.setPassword(passwordService.hash(UUID.randomUUID() + "-disabled"));
+                        user.setEnabled(false);
+                    } else {
+                        user.setPassword(passwordService.hashLegacyPassword(legacyPassword));
+                    }
                     userRepository.save(user);
                 });
     }

@@ -2,12 +2,14 @@ package com.example.userservice.controller;
 
 import com.example.userservice.model.User;
 import com.example.userservice.model.UserRole;
+import com.example.userservice.dto.UpdateRoleRequest;
 import com.example.userservice.exception.ForbiddenException;
 import com.example.userservice.service.AuthService;
 import com.example.userservice.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -26,19 +28,26 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<List<User>> getAllUsers(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         requireAdmin(authHeader);
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
+    @GetMapping("/patients")
+    public ResponseEntity<List<User>> getPatientUsers(
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        requireAdminOrReceptionist(authHeader);
+        return ResponseEntity.ok(userService.getPatientUsers());
+    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+    public ResponseEntity<User> getUserById(@RequestHeader(value = "Authorization", required = false) String authHeader, @PathVariable UUID id) {
         requireSelfOrAdmin(authHeader, id);
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
     @GetMapping("/by-email")
-    public ResponseEntity<User> getUserByEmail(@RequestHeader("Authorization") String authHeader, @RequestParam String email) {
+    public ResponseEntity<User> getUserByEmail(@RequestHeader(value = "Authorization", required = false) String authHeader, @RequestParam String email) {
         User caller = currentUser(authHeader);
         if (caller.getRole() != UserRole.ADMIN && !caller.getEmail().equalsIgnoreCase(email)) {
             throw new ForbiddenException("You may only view your own account");
@@ -47,27 +56,37 @@ public class UserController {
     }
 
     @GetMapping("/{id}/role")
-    public ResponseEntity<Map<String, String>> getUserRole(@RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+    public ResponseEntity<Map<String, String>> getUserRole(@RequestHeader(value = "Authorization", required = false) String authHeader, @PathVariable UUID id) {
         requireSelfOrAdmin(authHeader, id);
         UserRole role = userService.getUserById(id).getRole();
         return ResponseEntity.ok(Map.of("role", role != null ? role.name() : "UNKNOWN"));
     }
 
     @PostMapping
-    public ResponseEntity<User> createUser(@RequestHeader("Authorization") String authHeader, @RequestBody User user) {
+    public ResponseEntity<User> createUser(@RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody User user) {
         requireAdmin(authHeader);
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(user));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(@RequestHeader("Authorization") String authHeader, @PathVariable UUID id,
-            @RequestBody User user) {
-        User caller = requireSelfOrAdmin(authHeader, id);
-        return ResponseEntity.ok(userService.updateUser(id, user, caller.getRole() == UserRole.ADMIN));
+    public ResponseEntity<User> updateUser(@RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable UUID id, @Valid @RequestBody User user) {
+        requireSelfOrAdmin(authHeader, id);
+        return ResponseEntity.ok(userService.updateUser(id, user));
+    }
+
+    @PatchMapping("/{id}/role")
+    public ResponseEntity<User> updateUserRole(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateRoleRequest request) {
+        requireAdmin(authHeader);
+        return ResponseEntity.ok(userService.updateRole(id, request.role()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+    public ResponseEntity<Void> deleteUser(@RequestHeader(value = "Authorization", required = false) String authHeader, @PathVariable UUID id) {
         requireSelfOrAdmin(authHeader, id);
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
@@ -83,6 +102,13 @@ public class UserController {
         }
     }
 
+    private void requireAdminOrReceptionist(String authHeader) {
+        UserRole role = currentUser(authHeader).getRole();
+        if (role != UserRole.ADMIN && role != UserRole.RECEPTIONIST) {
+            throw new ForbiddenException("Administrator or receptionist role required");
+        }
+    }
+
     private User requireSelfOrAdmin(String authHeader, UUID targetId) {
         User caller = currentUser(authHeader);
         if (caller.getRole() != UserRole.ADMIN && !caller.getId().equals(targetId)) {
@@ -92,9 +118,11 @@ public class UserController {
     }
 
     private String stripBearer(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new ForbiddenException("Bearer token required");
+        if (authHeader == null || authHeader.length() < 8
+                || !authHeader.regionMatches(true, 0, "Bearer ", 0, 7)
+                || authHeader.substring(7).isBlank()) {
+            throw new com.example.userservice.exception.AuthRegistrationException("Bearer token required");
         }
-        return authHeader.substring(7);
+        return authHeader.substring(7).trim();
     }
 }

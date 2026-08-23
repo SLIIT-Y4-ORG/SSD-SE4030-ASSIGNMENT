@@ -9,8 +9,10 @@ import com.example.userservice.security.PasswordService;
 import com.example.userservice.security.TokenService;
 import com.example.userservice.security.TokenService.TokenType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Locale;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -27,28 +29,43 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public User registerUser(User user) {
-        if (userRepository.existsByEmail(user.getEmail())) {
+        String email = normalizeEmail(user.getEmail());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new AuthRegistrationException("User with email already exists");
         }
         
         // Public registration must never accept identity or privilege fields from the client.
         user.setId(UUID.randomUUID());
+        user.setEmail(email);
         user.setRole(UserRole.PATIENT);
+        user.setEnabled(true);
+        user.setAuthVersion(0L);
+        user.setRefreshVersion(0L);
         user.setPassword(passwordService.hash(user.getPassword()));
         return userRepository.save(user);
     }
 
     @Override
     public AuthResponse loginUser(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
-        
-        if (!passwordService.matches(request.getPassword(), user.getPassword())) {
+        User user = userRepository.findByEmailIgnoreCase(normalizeEmail(request.getEmail())).orElse(null);
+        if (user == null) {
+            passwordService.performDummyVerification(request.getPassword());
+            throw new AuthRegistrationException("Invalid credentials");
+        }
+        if (!passwordService.matches(request.getPassword(), user.getPassword()) || !user.isEnabled()) {
             throw new AuthRegistrationException("Invalid credentials");
         }
 
-        String token = tokenService.issue(user.getId(), TokenType.ACCESS);
-        String refreshToken = tokenService.issue(user.getId(), TokenType.REFRESH);
+        if (passwordService.needsUpgrade(user.getPassword())) {
+            user.setPassword(passwordService.hashLegacyPassword(request.getPassword()));
+        }
+
+        long refreshVersion = refreshVersion(user) + 1;
+        user.setRefreshVersion(refreshVersion);
+        userRepository.save(user);
+
+        String token = tokenService.issue(user.getId(), TokenType.ACCESS, authVersion(user));
+        String refreshToken = tokenService.issue(user.getId(), TokenType.REFRESH, refreshVersion);
         
         AuthResponse response = new AuthResponse();
         response.setAccessToken(token);
@@ -61,18 +78,28 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public void logoutUser(String accessToken) {
-        // Simple logout - in real app, invalidate token
+        TokenService.TokenClaims claims = tokenService.verify(accessToken, TokenType.ACCESS);
+        User user = requireEnabledUserForUpdate(claims.userId());
+        requireVersion(claims.version(), authVersion(user));
+        user.setAuthVersion(authVersion(user) + 1);
+        user.setRefreshVersion(refreshVersion(user) + 1);
+        userRepository.save(user);
     }
 
     @Override
+    @Transactional
     public AuthResponse refreshToken(String refreshToken) {
-        UUID userId = tokenService.verify(refreshToken, TokenType.REFRESH);
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+        TokenService.TokenClaims claims = tokenService.verify(refreshToken, TokenType.REFRESH);
+        User user = requireEnabledUserForUpdate(claims.userId());
+        requireVersion(claims.version(), refreshVersion(user));
+        long nextRefreshVersion = refreshVersion(user) + 1;
+        user.setRefreshVersion(nextRefreshVersion);
+        userRepository.save(user);
         AuthResponse response = new AuthResponse();
-        response.setAccessToken(tokenService.issue(userId, TokenType.ACCESS));
-        response.setRefreshToken(tokenService.issue(userId, TokenType.REFRESH));
+        response.setAccessToken(tokenService.issue(user.getId(), TokenType.ACCESS, authVersion(user)));
+        response.setRefreshToken(tokenService.issue(user.getId(), TokenType.REFRESH, nextRefreshVersion));
         response.setTokenType("Bearer");
         response.setExpiresIn(3600);
         response.setUser(user);
@@ -81,9 +108,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public User getCurrentUser(String accessToken) {
-        UUID userId = tokenService.verify(accessToken, TokenType.ACCESS);
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+        TokenService.TokenClaims claims = tokenService.verify(accessToken, TokenType.ACCESS);
+        User user = requireEnabledUser(claims.userId());
+        requireVersion(claims.version(), authVersion(user));
+        return user;
     }
 
     @Override
@@ -103,5 +131,41 @@ public class AuthServiceImpl implements AuthService {
                     .message("Invalid token")
                     .build();
         }
+    }
+
+    private User requireEnabledUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthRegistrationException("Invalid or expired token"));
+        if (!user.isEnabled()) {
+            throw new AuthRegistrationException("Invalid or expired token");
+        }
+        return user;
+    }
+
+    private User requireEnabledUserForUpdate(UUID userId) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new AuthRegistrationException("Invalid or expired token"));
+        if (!user.isEnabled()) {
+            throw new AuthRegistrationException("Invalid or expired token");
+        }
+        return user;
+    }
+
+    private void requireVersion(long tokenVersion, long currentVersion) {
+        if (tokenVersion != currentVersion) {
+            throw new AuthRegistrationException("Invalid or expired token");
+        }
+    }
+
+    private long authVersion(User user) {
+        return user.getAuthVersion() == null ? 0L : user.getAuthVersion();
+    }
+
+    private long refreshVersion(User user) {
+        return user.getRefreshVersion() == null ? 0L : user.getRefreshVersion();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 }
