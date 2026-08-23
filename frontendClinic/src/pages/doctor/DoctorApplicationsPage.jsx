@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getDoctors, updateDoctor } from '../../api'
+import { getPendingDoctorApplications, updateDoctor, approveDoctorApplication } from '../../api'
 import { useToast } from '../../components/Toast'
 
 const SPECIALIZATIONS = [
@@ -34,8 +34,8 @@ export default function DoctorApplicationsPage() {
     const [saving, setSaving] = useState({})
 
     useEffect(() => {
-        getDoctors()
-            .then(all => setApplications(all.filter(d => !d.verified)))
+        getPendingDoctorApplications()
+            .then(setApplications)
             .catch(() => toast('Failed to load applications.', 'error'))
             .finally(() => setLoading(false))
     }, [])
@@ -57,7 +57,8 @@ export default function DoctorApplicationsPage() {
         }
         setSaving(prev => ({ ...prev, [docId]: true }))
         try {
-            await updateDoctor(docId, { ...form, verified: true })
+            await updateDoctor(docId, form)
+            await approveDoctorApplication(docId)
             toast(`Dr. ${form.name} verified successfully ✅`, 'success')
             setApplications(prev => prev.filter(d => d.id !== docId))
             setExpandedId(null)

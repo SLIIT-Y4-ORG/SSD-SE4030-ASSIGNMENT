@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -33,9 +34,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<String> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleConflict(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<String> handleValidation(MethodArgumentNotValidException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid doctor application");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleAllExceptions(Exception ex) {
-        ex.printStackTrace(); // This will log to Docker logs
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal Server Error: " + ex.getMessage());
+        ex.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal Server Error");
     }
 }

@@ -51,7 +51,7 @@ steps:
         DB_USERNAME=postgres.bdgicssvyfumdnddxzbc,
         SUPABASE_URL=https://bdgicssvyfumdnddxzbc.supabase.co
       - "--update-secrets"
-      - "DB_PASSWORD=user-service-db-password:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest"
+      - "DB_PASSWORD=user-service-db-password:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,SECURITY_TOKEN_SECRET=user-service-token-secret:latest"
 
 images:
   - "us-central1-docker.pkg.dev/$PROJECT_ID/user-service/app:$COMMIT_SHA"
@@ -60,4 +60,3 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 timeout: "900s"
-

@@ -883,6 +883,33 @@ select option { background: var(--bg-secondary); color: var(--text-primary); }
   color: var(--accent-green);
 }
 
+.admin-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-role-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-role-control select {
+  min-width: 160px;
+}
+
 /* ---------- Animations ---------- */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }

@@ -7,6 +7,9 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Map;
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 public class UserServiceClient {
@@ -32,6 +35,18 @@ public class UserServiceClient {
         } catch (Exception e) {
             return invalid("Validation failed");
         }
+    }
+
+    public void updateUserRole(UUID userId, String role, String administratorToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(administratorToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> entity = new HttpEntity<>(Map.of("role", role), headers);
+        restTemplate.exchange(
+                userServiceUrl + "/api/users/" + userId + "/role",
+                HttpMethod.PATCH,
+                entity,
+                Void.class);
     }
 
     private TokenValidationResponse invalid(String message) {

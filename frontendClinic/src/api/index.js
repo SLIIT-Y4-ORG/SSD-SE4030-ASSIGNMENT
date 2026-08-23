@@ -8,7 +8,7 @@ const API_GATEWAY = (import.meta.env.VITE_API_GATEWAY || 'http://localhost:8080'
 // const API_GATEWAY = 'http://localhost:8080'
 
 function getToken() {
-    return localStorage.getItem('accessToken')
+    return sessionStorage.getItem('accessToken')
 }
 
 function authHeaders() {
@@ -48,6 +48,29 @@ export async function getMe() {
     return res.data
 }
 
+export async function getUsers() {
+    const res = await axios.get(`${API_GATEWAY}/api/users`, {
+        headers: authHeaders(),
+    })
+    return res.data
+}
+
+export async function getPatientUsers() {
+    const res = await axios.get(`${API_GATEWAY}/api/users/patients`, {
+        headers: authHeaders(),
+    })
+    return res.data
+}
+
+export async function updateUserRole(userId, role) {
+    const res = await axios.patch(
+        `${API_GATEWAY}/api/users/${userId}/role`,
+        { role },
+        { headers: authHeaders() }
+    )
+    return res.data
+}
+
 // ── Doctor Service ──────────────────────────────────────────────────────────
 
 export async function getDoctors(params = {}) {
@@ -82,6 +105,36 @@ export async function createDoctor(data) {
     return res.data
 }
 
+export async function submitDoctorApplication(data) {
+    const res = await axios.post(`${API_GATEWAY}/api/doctors/applications`, data, {
+        headers: authHeaders(),
+    })
+    return res.data
+}
+
+export async function getMyDoctorApplication() {
+    const res = await axios.get(`${API_GATEWAY}/api/doctors/applications/me`, {
+        headers: authHeaders(),
+    })
+    return res.status === 204 ? null : res.data
+}
+
+export async function getPendingDoctorApplications() {
+    const res = await axios.get(`${API_GATEWAY}/api/doctors/applications`, {
+        headers: authHeaders(),
+    })
+    return res.data
+}
+
+export async function approveDoctorApplication(doctorId) {
+    const res = await axios.patch(
+        `${API_GATEWAY}/api/doctors/${doctorId}/approve`,
+        {},
+        { headers: authHeaders() }
+    )
+    return res.data
+}
+
 export async function updateDoctor(doctorId, data) {
     const res = await axios.put(`${API_GATEWAY}/api/doctors/${doctorId}`, data, {
         headers: authHeaders(),
@@ -92,8 +145,8 @@ export async function updateDoctor(doctorId, data) {
 export async function verifyDoctor(doctorId, verified) {
     const res = await axios.patch(
         `${API_GATEWAY}/api/doctors/${doctorId}/verify`,
-        { verified },
-        { headers: authHeaders() }
+        null,
+        { headers: authHeaders(), params: { verified } }
     )
     return res.data
 }

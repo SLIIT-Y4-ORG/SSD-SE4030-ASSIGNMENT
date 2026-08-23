@@ -41,6 +41,10 @@ supabase:
 server:
   port: ${PORT:8081}
 
+security:
+  # Required in every environment; use a random value of at least 32 characters.
+  token-secret: ${SECURITY_TOKEN_SECRET}
+
 management:
   endpoints:
     web:

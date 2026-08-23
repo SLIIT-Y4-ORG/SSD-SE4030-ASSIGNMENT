@@ -1,16 +1,13 @@
 # Stage 1: Build
-FROM maven:3.9.9-eclipse-temurin-17-alpine AS builder
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
 # FROM maven:3.9.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 
-# Step 1: Cache dependencies (Huge time saver)
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
-
-# Step 2: Build the application
 COPY src ./src
 # For Local Development
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests -B
 # For CI/CD Pipeline (GitHub Actions, Jenkins) & Docker
 # RUN mvn clean package -DskipTests -B
 

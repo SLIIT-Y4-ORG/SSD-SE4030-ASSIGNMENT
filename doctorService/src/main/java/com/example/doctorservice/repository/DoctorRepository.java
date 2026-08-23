@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
 
     boolean existsByEmail(String email);
+    boolean existsByUserId(UUID userId);
+    boolean existsByLicenseNumber(String licenseNumber);
 
     Optional<Doctor> findByEmail(String email);
 
@@ -23,4 +25,9 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     List<Doctor> findBySpecializationIgnoreCase(String specialization);
 
     List<Doctor> findByDepartmentIgnoreCase(String department);
+
+    List<Doctor> findByVerifiedFalseOrderByCreatedAtAsc();
+    List<Doctor> findByVerifiedTrueAndIsActiveTrue();
+    List<Doctor> findByVerifiedTrueAndIsActiveTrueAndSpecializationIgnoreCase(String specialization);
+    List<Doctor> findByVerifiedTrueAndIsActiveTrueAndDepartmentIgnoreCase(String department);
 }

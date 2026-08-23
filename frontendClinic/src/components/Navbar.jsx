@@ -36,13 +36,28 @@ export default function Navbar() {
                             Doctors
                         </NavLink>
                         {user?.role === 'PATIENT' && (
-                            <NavLink to="/payments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                                Payments
+                            <>
+                                <NavLink to="/payments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                                    Payments
+                                </NavLink>
+                                <NavLink to="/my-schedule" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                                    Apply as Doctor
+                                </NavLink>
+                            </>
+                        )}
+                        {user?.role === 'DOCTOR' && (
+                            <NavLink to="/my-schedule" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                                My Schedule
                             </NavLink>
                         )}
                         {(user?.role === 'ADMIN' || user?.role === 'RECEPTIONIST') && (
                             <NavLink to="/doctors/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                                 + Add Doctor
+                            </NavLink>
+                        )}
+                        {user?.role === 'ADMIN' && (
+                            <NavLink to="/admin/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                                Users
                             </NavLink>
                         )}
                     </div>

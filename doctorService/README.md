@@ -21,6 +21,10 @@ Manages doctor profiles and pre-created time slots with reserve/release semantic
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/doctors` | ADMIN / RECEPTIONIST | Create doctor profile |
+| `POST` | `/api/doctors/applications` | PATIENT | Apply to become a doctor; identity is taken from the access token |
+| `GET` | `/api/doctors/applications/me` | Any authenticated | Get the caller's doctor application |
+| `GET` | `/api/doctors/applications` | ADMIN / RECEPTIONIST | List pending doctor applications |
+| `PATCH` | `/api/doctors/{id}/approve` | ADMIN | Approve an application and promote its user to DOCTOR |
 | `GET` | `/api/doctors` | Any authenticated | List doctors (filter: `?specialization=` or `?department=`) |
 | `GET` | `/api/doctors/{id}` | Any authenticated | Get doctor by ID |
 | `POST` | `/api/doctors/{id}/slots` | ADMIN / DOCTOR / RECEPTIONIST | Bulk-create availability slots |
@@ -32,6 +36,27 @@ Manages doctor profiles and pre-created time slots with reserve/release semantic
 ---
 
 ## Request / Response Examples
+
+### Patient doctor application
+
+```http
+POST /api/doctors/applications
+Authorization: Bearer <patient-token>
+Content-Type: application/json
+
+{
+  "name": "Ayesha Fernando",
+  "specialization": "Cardiology",
+  "phone": "+94771234567",
+  "licenseNumber": "SLMC-2020-1234"
+}
+```
+
+The service derives `userId` and `email` from the validated token. Client-supplied
+identity, role, verification, and activation values are not accepted. The application
+remains inactive until an administrator approves it. Approval changes the linked user
+role to `DOCTOR` and activates the profile; failed profile activation triggers a
+compensating role change back to `PATIENT`.
 
 ### Create a doctor
 ```http

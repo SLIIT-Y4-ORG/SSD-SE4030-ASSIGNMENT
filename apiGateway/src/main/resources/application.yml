@@ -12,7 +12,7 @@ spring:
       routes:
         # User Service Routes
         - id: user-service
-          uri: https://user-service-78514746924.europe-west1.run.app
+          uri: ${USER_SERVICE_URI:http://user-service:8081}
           predicates:
             - Path=/api/auth/**, /api/users/**
           filters:
@@ -20,7 +20,7 @@ spring:
 
         # Doctor Service Routes
         - id: doctor-service
-          uri: https://doctor-service-78514746924.europe-west1.run.app
+          uri: ${DOCTOR_SERVICE_URI:http://doctor-service:8082}
           predicates:
             - Path=/api/doctors/**, /api/slots/**
           filters:
@@ -28,7 +28,7 @@ spring:
 
         # Payment Service Routes
         - id: payment-service
-          uri: https://payment-service-78514746924.europe-west1.run.app
+          uri: ${PAYMENT_SERVICE_URI:http://payment-service:8080}
           predicates:
             - Path=/api/payments/**
           filters:
@@ -36,7 +36,7 @@ spring:
 
         # Updated Appointment Service Route with StripPrefix=2
         - id: appointment-service
-          uri: https://appointment-service-78514746924.europe-west1.run.app
+          uri: ${APPOINTMENT_SERVICE_URI:http://appointment-service:8084}
           predicates:
             - Path=/api/appointments/**
           filters:
@@ -44,7 +44,7 @@ spring:
 
         # Patient Service Routes
         - id: patient-service
-          uri: https://patientservice-78514746924.europe-west1.run.app
+          uri: ${PATIENT_SERVICE_URI:http://patient-service:8080}
           predicates:
             - Path=/api/patients/**
           filters:
