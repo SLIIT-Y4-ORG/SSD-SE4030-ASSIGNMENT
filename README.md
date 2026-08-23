@@ -16,7 +16,7 @@ preserves the application's existing clinical workflows.
 
 ## Project Links
 
-- Original project: _Add the GitHub URL of the unmodified project_
+- Original project repositories: https://github.com/orgs/CTSEAssignment01/repositories
 - Modified project: https://github.com/SLIIT-Y4-ORG/SSD-SE4030-ASSIGNMENT
 - Demonstration video: _Add the YouTube URL (maximum 20 minutes)_
 

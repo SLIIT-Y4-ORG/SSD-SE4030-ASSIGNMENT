@@ -1,8 +1,8 @@
 # Individual Security Contribution: Two Vulnerability Fixes
 
-This document contains report-ready evidence for one group member. Replace the member placeholder before submission.
+This document contains report-ready evidence for the two vulnerability fixes completed as Darshan R's individual contribution.
 
-**Member:** `[name and index number]`
+**Member:** Darshan R — IT22097156
 
 ## Finding 1: Insecure password storage and forgeable authentication tokens
 
