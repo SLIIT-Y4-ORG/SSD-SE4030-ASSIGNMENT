@@ -1,27 +1,118 @@
-version: "3.8"
-
 services:
   user-service:
     image: user-service:local
+    build: ./userService
     ports:
       - "8081:8081"
     env_file:
       - ./userService/.env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
   doctor-service:
     image: doctor-service:local
+    build: ./doctorService
     ports:
       - "8082:8082"
     env_file:
       - ./doctorService/.env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
+    depends_on:
+      user-service:
+        condition: service_started
+
+  patient-service:
+    image: patient-service:local
+    build: ./PatientService
+    ports:
+      - "8083:8080"
+    env_file:
+      - ./PatientService/.env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      PORT: 8080
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
+      SPRING_SQL_INIT_MODE: always
+      USER_SERVICE_URL: http://user-service:8081
+      DOCTOR_SERVICE_URL: http://doctor-service:8082
     depends_on:
       - user-service
+      - doctor-service
+
+  payment-service:
+    image: payment-service:local
+    build: ./paymentService
+    ports:
+      - "8085:8080"
+    env_file:
+      - ./paymentService/.env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      PORT: 8080
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
+
+  appointment-service:
+    image: appointment-service:local
+    build: ./appointmentService
+    ports:
+      - "8084:8084"
+    env_file:
+      - ./appointmentService/.env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
+      PATIENT_SERVICE_URL: http://patient-service:8080
+      DOCTOR_SERVICE_URL: http://doctor-service:8082
+      USER_SERVICE_URL: http://user-service:8081
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+    depends_on:
+      - patient-service
+      - doctor-service
+      - payment-service
 
   api-gateway:
     image: api-gateway:local
+    build: ./apiGateway
     ports:
       - "8080:8080"
     env_file:
       - ./apiGateway/.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      USER_SERVICE_URI: http://user-service:8081
+      DOCTOR_SERVICE_URI: http://doctor-service:8082
+      PATIENT_SERVICE_URI: http://patient-service:8080
+      APPOINTMENT_SERVICE_URI: http://appointment-service:8084
+      PAYMENT_SERVICE_URI: http://payment-service:8080
     depends_on:
       - user-service
       - doctor-service
+      - patient-service
+      - appointment-service
+      - payment-service
+
+  frontend:
+    image: clinic-frontend:local
+    build: ./frontendClinic
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway

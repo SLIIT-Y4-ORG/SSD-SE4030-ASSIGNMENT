@@ -7,23 +7,37 @@ spring:
     gateway:
       routes:
         - id: user-service-prod
-          uri: https://user-service-268672367192.us-central1.run.app
+          uri: ${USER_SERVICE_URI:http://user-service:8081}
           predicates:
             - Path=/api/auth/**, /api/users/**
           filters:
             - RewritePath=/api/(?<segment>.*), /api/$\{segment}
             
         - id: doctor-service-prod
-          uri: https://doctor-service-efc3c5f3xa-uc.a.run.app
+          uri: ${DOCTOR_SERVICE_URI:http://doctor-service:8082}
           predicates:
             - Path=/api/doctors/**, /api/slots/**
           filters:
             - RewritePath=/api/(?<segment>.*), /api/$\{segment}
 
         - id: payment-service-prod
-          uri: ${PAYMENT_SERVICE_URL:http://payment-service:8085}
+          uri: ${PAYMENT_SERVICE_URI:http://payment-service:8080}
           predicates:
             - Path=/api/payments/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+
+        - id: appointment-service-prod
+          uri: ${APPOINTMENT_SERVICE_URI:http://appointment-service:8084}
+          predicates:
+            - Path=/api/appointments/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+
+        - id: patient-service-prod
+          uri: ${PATIENT_SERVICE_URI:http://patient-service:8080}
+          predicates:
+            - Path=/api/patients/**
           filters:
             - RewritePath=/api/(?<segment>.*), /api/$\{segment}
 

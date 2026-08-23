@@ -30,7 +30,8 @@ spring:
 
   sql:
     init:
-      mode: never
+      # Create the dedicated schema before Hibernate attempts to create tables.
+      mode: always
       schema-locations: classpath:schema.sql
 
 # User-service URL for token validation
