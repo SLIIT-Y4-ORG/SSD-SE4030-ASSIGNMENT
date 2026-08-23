@@ -90,11 +90,12 @@ export default function RegisterPage() {
                                 id="reg-password"
                                 name="password"
                                 type="password"
-                                placeholder="Minimum 8 characters"
+                                placeholder="12–128 characters"
                                 value={form.password}
                                 onChange={handleChange}
                                 required
-                                minLength={8}
+                                minLength={12}
+                                maxLength={128}
                             />
                         </div>
 

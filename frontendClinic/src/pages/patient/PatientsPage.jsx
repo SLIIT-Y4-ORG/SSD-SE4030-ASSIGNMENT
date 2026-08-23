@@ -1,18 +1,63 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getPatients } from '../../api'
+import { getPatients, getPatientUsers } from '../../api'
+import { useAuth } from '../../context/AuthContext'
 
 export default function PatientsPage() {
+    const { user } = useAuth()
     const [patients, setPatients] = useState([])
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
     useEffect(() => {
-        getPatients()
-            .then(data => setPatients(Array.isArray(data) ? data : []))
+        const loadPatients = async () => {
+            const profiles = await getPatients()
+            const patientProfiles = Array.isArray(profiles) ? profiles : []
+
+            // Patient accounts and patient medical profiles live in separate
+            // services. Staff should still see a newly registered account
+            // before its owner completes the optional medical profile.
+            const users = await getPatientUsers()
+            const patientUsers = (Array.isArray(users) ? users : [])
+                .filter(account => account.role === 'PATIENT')
+
+            const profilesByUserId = new Map(
+                patientProfiles
+                    .filter(profile => profile.userId)
+                    .map(profile => [profile.userId, profile])
+            )
+            const profilesByEmail = new Map(
+                patientProfiles
+                    .filter(profile => profile.email)
+                    .map(profile => [profile.email.toLowerCase(), profile])
+            )
+
+            const merged = patientUsers.map(account => {
+                const profile = profilesByUserId.get(account.id)
+                    || profilesByEmail.get((account.email || '').toLowerCase())
+
+                return profile
+                    ? { ...profile, profileComplete: true }
+                    : {
+                        id: `account-${account.id}`,
+                        userId: account.id,
+                        name: account.name,
+                        email: account.email,
+                        phone: account.phone,
+                        profileComplete: false,
+                    }
+            })
+
+            // Preserve orphaned/legacy profiles that have no matching user.
+            const matchedProfileIds = new Set(merged.filter(item => item.profileComplete).map(item => item.id))
+            return [...merged, ...patientProfiles.filter(profile => !matchedProfileIds.has(profile.id))]
+        }
+
+        loadPatients()
+            .then(setPatients)
             .catch(err => setError(err?.response?.data?.error || 'Failed to load patients.'))
             .finally(() => setLoading(false))
-    }, [])
+    }, [user?.role])
 
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase()
@@ -70,6 +115,11 @@ export default function PatientsPage() {
                                 <div>
                                     <div className="doctor-name">{patient.name || 'Unknown'}</div>
                                     <div className="doctor-email">{patient.email || 'No email'}</div>
+                                    {patient.profileComplete === false && (
+                                        <div className="badge badge-warning" style={{ marginTop: '8px' }}>
+                                            Medical profile incomplete
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

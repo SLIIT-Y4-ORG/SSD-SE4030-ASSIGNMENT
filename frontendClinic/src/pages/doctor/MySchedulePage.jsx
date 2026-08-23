@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { getDoctorByUserId, createDoctor } from '../../api'
+import { getMyDoctorApplication, submitDoctorApplication } from '../../api'
 
 const SPECIALIZATIONS = [
     'General Practice', 'Cardiology', 'Neurology', 'Pediatrics',
@@ -11,7 +11,7 @@ const SPECIALIZATIONS = [
 ]
 
 export default function MySchedulePage() {
-    const { user } = useAuth()
+    const { user, refreshUser } = useAuth()
     const navigate = useNavigate()
 
     const [status, setStatus] = useState('loading')
@@ -37,13 +37,14 @@ export default function MySchedulePage() {
             phone: user.phone || '',
         }))
 
-        getDoctorByUserId(user.id)
-            .then(doctor => {
+        getMyDoctorApplication()
+            .then(async doctor => {
                 if (!doctor) {
                     setStatus('apply')
                 } else if (!doctor.verified) {
                     setStatus('pending')
                 } else {
+                    await refreshUser()
                     // Redirect verified doctor to their public profile / slot management
                     navigate(`/doctors/${doctor.id}`, { replace: true })
                 }
@@ -52,21 +53,18 @@ export default function MySchedulePage() {
                 setErrorMsg(err?.response?.data?.error || 'Failed to check your doctor profile.')
                 setStatus('error')
             })
-    }, [user, navigate])
+    }, [user, navigate, refreshUser])
 
     const handleApply = async e => {
         e.preventDefault()
         setApplyError('')
         setApplying(true)
         try {
-            await createDoctor({
+            await submitDoctorApplication({
                 name: form.name,
-                email: form.email,
                 phone: form.phone,
-                specialization: form.specialization || null,
+                specialization: form.specialization,
                 licenseNumber: form.licenseNumber,
-                userId: user.id,
-                verified: false,
             })
             setStatus('pending')
         } catch (err) {
@@ -105,14 +103,14 @@ export default function MySchedulePage() {
                     <div className="hero-greeting">⏳ Application submitted</div>
                     <h1 className="hero-title">Pending Verification</h1>
                     <p className="hero-subtitle">
-                        Your doctor profile has been received and is awaiting review by a Receptionist or Admin.
+                        Your doctor profile has been received and is awaiting review by an administrator.
                         You will have full access to your schedule once verified.
                     </p>
                 </div>
                 <div className="card" style={{ maxWidth: '520px' }}>
                     <div className="card-header"><div className="card-title">ℹ️ What happens next?</div></div>
                     <ol style={{ paddingLeft: '20px', lineHeight: 2, color: 'var(--text-secondary)', margin: 0 }}>
-                        <li>A Receptionist reviews your application.</li>
+                        <li>An administrator reviews your application.</li>
                         <li>They confirm your specialization and license details.</li>
                         <li>Once approved, you can manage slots and appear for bookings.</li>
                     </ol>
@@ -120,6 +118,7 @@ export default function MySchedulePage() {
                         Your User ID: {user?.id}
                     </div>
                     <button className="btn btn-secondary" style={{ marginTop: '16px' }} onClick={() => navigate('/dashboard')}>← Back to Dashboard</button>
+                    <button className="btn btn-primary" style={{ marginTop: '16px', marginLeft: '8px' }} onClick={() => window.location.reload()}>Check Approval Status</button>
                 </div>
             </div>
         )
@@ -133,7 +132,7 @@ export default function MySchedulePage() {
                 <h1 className="hero-title">Apply as a Doctor</h1>
                 <p className="hero-subtitle">
                     Submit your details to be reviewed by our staff. You'll be able to manage
-                    your availability slots once a Receptionist verifies your profile.
+                    your availability slots once an administrator verifies your profile.
                 </p>
             </div>
 
@@ -181,17 +180,18 @@ export default function MySchedulePage() {
                         />
                     </div>
                     <div className="form-group">
-                        <label>Specialization <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — receptionist will confirm)</span></label>
+                        <label>Specialization</label>
                         <select
                             value={form.specialization}
                             onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))}
+                            required
                         >
                             <option value="">Select if known…</option>
                             {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div className="alert alert-info" style={{ marginBottom: '16px' }}>
-                        ℹ️ Your department and years of experience will be confirmed by the Receptionist during verification.
+                        ℹ️ Your department and years of experience will be confirmed by the administrator during verification.
                     </div>
                     <button type="submit" className="btn btn-primary" disabled={applying}>
                         {applying ? '⏳ Submitting…' : '📨 Submit Application'}

@@ -125,7 +125,7 @@ export default function DoctorDetailPage() {
             </div>
 
             {/* Link User Account — ADMIN / RECEPTIONIST only */}
-            {hasRole('ADMIN', 'RECEPTIONIST') && (
+            {hasRole('ADMIN') && (
                 <div className="card" style={{ marginBottom: '24px', maxWidth: '560px' }}>
                     <div
                         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
@@ -179,7 +179,7 @@ export default function DoctorDetailPage() {
             )}
 
             {/* Verification Status — badge for all, toggle for ADMIN/RECEPTIONIST */}
-            {hasRole('ADMIN', 'RECEPTIONIST') ? (
+            {hasRole('ADMIN') ? (
                 <div className="card" style={{ marginBottom: '24px', maxWidth: '560px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div>

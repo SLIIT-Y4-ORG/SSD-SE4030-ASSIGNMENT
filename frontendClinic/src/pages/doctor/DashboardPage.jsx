@@ -11,6 +11,7 @@ const ROLE_CONFIG = {
             { label: 'My Patient Profile', to: '/patients/me' },
             { label: 'Browse Doctors', to: '/doctors' },
             { label: 'My Payments', to: '/payments' },
+            { label: 'Apply as a Doctor', to: '/my-schedule' },
         ],
     },
     DOCTOR: {
@@ -25,7 +26,6 @@ const ROLE_CONFIG = {
         color: 'badge-cyan',
         desc: 'Manage doctor registrations and appointment slots.',
         actions: [
-            { label: '📋 Doctor Applications', to: '/doctor-applications' },
             { label: '👨‍⚕️ All Doctors', to: '/doctors' },
             { label: '➕ Add Doctor', to: '/doctors/new' },
             { label: '🧾 Patients', to: '/patients' },
