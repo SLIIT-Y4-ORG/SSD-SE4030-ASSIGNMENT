@@ -11,7 +11,7 @@ preserves the application's existing clinical workflows.
 |---|---|
 | _Add member 1_ | _Add index number_ |
 | _Add member 2_ | _Add index number_ |
-| _Add member 3_ | _Add index number_ |
+| Wijesinghe L P P | IT22555380 |
 | Darshan R | IT22097156 |
 
 ## Project Links
