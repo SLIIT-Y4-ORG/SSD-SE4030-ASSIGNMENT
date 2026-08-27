@@ -104,59 +104,15 @@ This repository contains the security-hardened **ClinicMate** healthcare microse
 
 ## OAuth 2.0 / OpenID Connect (OIDC) Implementation
 
-The application implements federated single sign-on (SSO) via **Google Sign-In** using the **OAuth 2.0 / OpenID Connect (OIDC) Authorization Code Grant**.
+The application implements federated single sign-on (SSO) via **Google Sign-In** using the **OAuth 2.0 / OpenID Connect (OIDC) Authorization Code Grant**. For the complete architectural sequence diagram, threat modeling matrix, and endpoint specifications, refer to [SECURITY_FINDINGS_PANDUKA.md](SECURITY_FINDINGS_PANDUKA.md).
 
-### 1. Architectural Sequence Flow
-```
-[ User / Browser ]             [ Frontend SPA ]             [ API Gateway / User Service ]           [ Google Identity ]
-       |                              |                                    |                                 |
-       | 1. Click "Sign in with Google"|                                   |                                 |
-       |----------------------------->|                                    |                                 |
-       |                              | 2. Generate random state & store   |                                 |
-       |                              |    Redirect to Google Auth URL     |                                 |
-       | 3. Redirect to Google Auth   |----------------------------------->|                                 |
-       |---------------------------------------------------------------------------------------------------->|
-       |                              |                                    |                                 |
-       | 4. Authenticate & Grant Consent                                   |                                 |
-       |---------------------------------------------------------------------------------------------------->|
-       |                              |                                    |                                 |
-       | 5. Redirect back with ?code=AUTH_CODE&state=STATE                 |                                 |
-       |<----------------------------------------------------------------------------------------------------|
-       |                              |                                    |                                 |
-       | 6. Render /auth/callback     |                                    |                                 |
-       |----------------------------->|                                    |                                 |
-       |                              | 7. Validate state (CSRF check)     |                                 |
-       |                              |    POST /api/auth/google {code}    |                                 |
-       |                              |----------------------------------->|                                 |
-       |                              |                                    | 8. Server-to-server code        |
-       |                              |                                    |    exchange (client_secret)     |
-       |                              |                                    |-------------------------------->|
-       |                              |                                    | 9. Returns id_token & tokens    |
-       |                              |                                    |<--------------------------------|
-       |                              |                                    |                                 |
-       |                              |                                    | 10. Verify email_verified == true|
-       |                              |                                    |     Auto-provision PATIENT user |
-       |                              |                                    |     Issue ClinicMate JWT tokens |
-       |                              | 11. Return AuthResponse (tokens)   |                                 |
-       |                              |<-----------------------------------|                                 |
-       | 12. Store in sessionStorage  |                                    |                                 |
-       |     Redirect to /dashboard   |                                    |                                 |
-       |<-----------------------------|                                    |                                 |
-```
-
-### 2. Security Controls & Standards Adherence
+### Security Controls & Standards Adherence
 - **Confidential Client Credentials:** The Google `client_secret` is retained strictly within the backend `userService` environment configuration. It is never transmitted to or embedded in the frontend bundle, complying with OAuth 2.0 confidential client standards.
 - **CSRF Mitigation (State Parameter):** A cryptographically random `state` parameter is generated in the browser before redirecting and strictly verified upon return to `/auth/callback`, neutralizing authorization code injection and login CSRF attacks (CWE-352).
 - **Email Verification Guard:** The backend strictly validates the `email_verified == true` claim returned in the Google ID token/UserInfo response before authenticating or provisioning any account.
 - **Principle of Least Privilege:** Self-registered Google accounts are assigned the `PATIENT` role by default (`ROLE_PATIENT`). Administrative or Doctor privileges cannot be self-assigned.
 - **Isolated Password Field:** Auto-provisioned federated accounts are initialized with high-entropy unguessable password hashes, preventing credential stuffing or empty password logins.
 - **Microservices & Database Resilience:** Configured `extra_hosts` for Supabase transaction pooler mapping (`aws-0-ap-south-1.pooler.supabase.com:65.0.195.55`), `ddl-auto: none`, connection pool tuning (`max-pool: 3`, `connection-timeout: 60000`), and container restart policies (`restart: unless-stopped`).
-
-### 3. Key Endpoints & Routes
-- **`GET /api/auth/google/url?state={state}&redirectUri={redirectUri}`:** Generates the secure Google OAuth 2.0 authorization URL.
-- **`POST /api/auth/google`:** Accepts authorization code and redirect URI, performs server-side token exchange with Google, and returns ClinicMate JWT tokens.
-- **`GET /api/auth/google/callback`:** Backend callback redirection handler.
-- **`/auth/callback`:** Frontend React callback route displaying animated authentication progress, verifying CSRF state, and routing the user to `/dashboard`.
 
 ---
 
