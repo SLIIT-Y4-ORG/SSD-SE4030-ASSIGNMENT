@@ -8,10 +8,10 @@ This repository contains the security-hardened **ClinicMate** healthcare microse
 
 | Member Name | Student ID | Assigned Vulnerabilities / Contributions | Branch |
 | :--- | :--- | :--- | :--- |
+| _Add Member 1_ | Add Index Number | _Add Contribution_ | _Add Branch_ |
+| _Add Member 2_ | Add Index Number| _Add Contribution_ | _Add Branch_ |
 | **Wijesinghe L P P** | **IT22555380** | **Vulnerability 1:** Content Security Policy (CSP) Header Not Set (CWE-693)<br>**Vulnerability 2:** Missing Anti-Clickjacking Header (X-Frame-Options / frame-ancestors) (CWE-1021)<br>**Feature:** Federated Authentication via Google Sign-In (OAuth 2.0 / OIDC Authorization Code Grant) | `feature/panduka` |
 | **Darshan R** | **IT22097156** | **Finding 1:** Insecure Password Storage & Predictable Auth Tokens (CWE-256, CWE-287)<br>**Finding 2:** Broken Access Control & Privilege Escalation (CWE-269, CWE-639) | `feature/rd927` |
-| _Add Member 3_ | _Add Index Number_ | _Add Contribution_ | _Add Branch_ |
-| _Add Member 4_ | _Add Index Number_ | _Add Contribution_ | _Add Branch_ |
 
 ---
 
