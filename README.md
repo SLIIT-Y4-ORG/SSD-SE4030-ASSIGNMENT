@@ -102,11 +102,7 @@ This repository contains the security-hardened **ClinicMate** healthcare microse
 
 ---
 
-## OAuth 2.0 / OpenID Connect (OIDC) Implementation
-
-The application implements federated single sign-on (SSO) via **Google Sign-In** using the **OAuth 2.0 / OpenID Connect (OIDC) Authorization Code Grant**. For the complete architectural sequence diagram, threat modeling matrix, and endpoint specifications, refer to [SECURITY_FINDINGS_PANDUKA.md](SECURITY_FINDINGS_PANDUKA.md).
-
-### Security Controls & Standards Adherence
+### 2. Security Controls & Standards Adherence
 - **Confidential Client Credentials:** The Google `client_secret` is retained strictly within the backend `userService` environment configuration. It is never transmitted to or embedded in the frontend bundle, complying with OAuth 2.0 confidential client standards.
 - **CSRF Mitigation (State Parameter):** A cryptographically random `state` parameter is generated in the browser before redirecting and strictly verified upon return to `/auth/callback`, neutralizing authorization code injection and login CSRF attacks (CWE-352).
 - **Email Verification Guard:** The backend strictly validates the `email_verified == true` claim returned in the Google ID token/UserInfo response before authenticating or provisioning any account.
