@@ -20,6 +20,7 @@ import PaymentsPage from './pages/PaymentsPage'
 import PatientProfilePage from './pages/patient/PatientProfilePage'
 import PatientsPage from './pages/patient/PatientsPage'
 import UsersPage from './pages/admin/UsersPage'
+import OAuthCallbackPage from './pages/OAuthCallbackPage'
 
 function Layout({ children }) {
     return (
@@ -39,6 +40,7 @@ export default function App() {
                         {/* Public routes */}
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/register" element={<RegisterPage />} />
+                        <Route path="/auth/callback" element={<OAuthCallbackPage />} />
 
                         {/* Protected routes - Doctor Service*/}
                         <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute> }/>
