@@ -41,6 +41,20 @@ export async function refreshTokens(refreshToken) {
     return res.data
 }
 
+export async function getGoogleAuthUrl(state, redirectUri) {
+    const params = new URLSearchParams()
+    if (state) params.append('state', state)
+    if (redirectUri) params.append('redirectUri', redirectUri)
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    const res = await axios.get(`${API_GATEWAY}/api/auth/google/url${queryString}`)
+    return res.data.url
+}
+
+export async function loginWithGoogle(code, redirectUri) {
+    const res = await axios.post(`${API_GATEWAY}/api/auth/google`, { code, redirectUri })
+    return res.data
+}
+
 export async function getMe() {
     const res = await axios.get(`${API_GATEWAY}/api/auth/me`, {
         headers: authHeaders(),
