@@ -15,4 +15,8 @@ public interface AuthService {
     User getCurrentUser(String accessToken);
 
     TokenValidationResponse validateToken(String accessToken);
+
+    AuthResponse loginWithGoogle(String code, String redirectUri);
+
+    String getGoogleAuthorizationUrl(String state, String redirectUri);
 }

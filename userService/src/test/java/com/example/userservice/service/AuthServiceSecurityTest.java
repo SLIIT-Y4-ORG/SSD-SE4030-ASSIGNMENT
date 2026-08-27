@@ -108,4 +108,52 @@ class AuthServiceSecurityTest {
         assertEquals(unknown.getMessage(), incorrect.getMessage());
         assertEquals("Invalid credentials", unknown.getMessage());
     }
+
+    @Test
+    void googleLoginProvisionsPatientWhenUserDoesNotExist() {
+        UserRepository repository = mock(UserRepository.class);
+        PasswordService passwords = new PasswordService();
+        TokenService tokens = new TokenService("test-secret-that-is-at-least-32-characters-long");
+        com.example.userservice.security.GoogleOAuthService googleOAuthService = mock(com.example.userservice.security.GoogleOAuthService.class);
+        AuthServiceImpl service = new AuthServiceImpl(repository, passwords, tokens, googleOAuthService);
+
+        com.example.userservice.dto.GoogleUserInfo googleUser = com.example.userservice.dto.GoogleUserInfo.builder()
+                .email("newpatient@gmail.com")
+                .name("New Patient")
+                .emailVerified(true)
+                .build();
+        when(googleOAuthService.exchangeCodeForUserInfo("valid-code", "http://localhost:5173/auth/callback"))
+                .thenReturn(googleUser);
+        when(repository.findByEmailIgnoreCase("newpatient@gmail.com")).thenReturn(java.util.Optional.empty());
+        when(repository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthResponse response = service.loginWithGoogle("valid-code", "http://localhost:5173/auth/callback");
+
+        assertNotNull(response);
+        assertNotNull(response.getAccessToken());
+        assertNotNull(response.getRefreshToken());
+        assertEquals(UserRole.PATIENT, response.getUser().getRole());
+        assertEquals("newpatient@gmail.com", response.getUser().getEmail());
+        assertTrue(response.getUser().isEnabled());
+    }
+
+    @Test
+    void googleLoginRejectsDisabledAccount() {
+        UserRepository repository = mock(UserRepository.class);
+        PasswordService passwords = new PasswordService();
+        TokenService tokens = new TokenService("test-secret-that-is-at-least-32-characters-long");
+        com.example.userservice.security.GoogleOAuthService googleOAuthService = mock(com.example.userservice.security.GoogleOAuthService.class);
+        AuthServiceImpl service = new AuthServiceImpl(repository, passwords, tokens, googleOAuthService);
+
+        com.example.userservice.dto.GoogleUserInfo googleUser = com.example.userservice.dto.GoogleUserInfo.builder()
+                .email("banned@gmail.com")
+                .name("Banned User")
+                .emailVerified(true)
+                .build();
+        when(googleOAuthService.exchangeCodeForUserInfo("valid-code", null)).thenReturn(googleUser);
+        User user = User.builder().id(java.util.UUID.randomUUID()).email("banned@gmail.com").enabled(false).build();
+        when(repository.findByEmailIgnoreCase("banned@gmail.com")).thenReturn(java.util.Optional.of(user));
+
+        assertThrows(AuthRegistrationException.class, () -> service.loginWithGoogle("valid-code", null));
+    }
 }

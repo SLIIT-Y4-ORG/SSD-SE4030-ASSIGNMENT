@@ -49,6 +49,43 @@ public class AuthController {
         return ResponseEntity.ok(authService.validateToken(stripBearer(authHeader)));
     }
 
+    @GetMapping("/google/url")
+    public ResponseEntity<java.util.Map<String, String>> getGoogleAuthUrl(
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "redirectUri", required = false) String redirectUri) {
+        String url = authService.getGoogleAuthorizationUrl(state, redirectUri);
+        return ResponseEntity.ok(java.util.Map.of("url", url));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody com.example.userservice.dto.GoogleLoginRequest request) {
+        return ResponseEntity.ok(authService.loginWithGoogle(request.getCode(), request.getRedirectUri()));
+    }
+
+    @GetMapping("/google/callback")
+    public ResponseEntity<Void> googleCallback(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "error", required = false) String error) {
+        String targetUrl = "http://localhost:5173/auth/callback";
+        StringBuilder redirectBuilder = new StringBuilder(targetUrl);
+        boolean first = true;
+        if (code != null) {
+            redirectBuilder.append(first ? "?" : "&").append("code=").append(code);
+            first = false;
+        }
+        if (state != null) {
+            redirectBuilder.append(first ? "?" : "&").append("state=").append(state);
+            first = false;
+        }
+        if (error != null) {
+            redirectBuilder.append(first ? "?" : "&").append("error=").append(error);
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(java.net.URI.create(redirectBuilder.toString()))
+                .build();
+    }
+
     private String stripBearer(String authHeader) {
         if (authHeader == null || authHeader.length() < 8
                 || !authHeader.regionMatches(true, 0, "Bearer ", 0, 7)
