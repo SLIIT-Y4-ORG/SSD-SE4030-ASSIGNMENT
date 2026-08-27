@@ -2,16 +2,24 @@ services:
   user-service:
     image: user-service:local
     build: ./userService
+    restart: unless-stopped
     ports:
       - "8081:8081"
     env_file:
       - ./userService/.env
+    extra_hosts:
+      - "aws-0-ap-south-1.pooler.supabase.com:65.0.195.55"
     dns:
       - 1.1.1.1
       - 8.8.8.8
     environment:
-      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 3
       SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: 60000
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/auth/callback}
   doctor-service:
     image: doctor-service:local
     build: ./doctorService

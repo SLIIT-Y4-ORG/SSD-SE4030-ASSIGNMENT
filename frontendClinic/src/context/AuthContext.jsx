@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from '../api'
+import { getMe, login as apiLogin, loginWithGoogle as apiLoginWithGoogle, logout as apiLogout, register as apiRegister } from '../api'
 
 const AuthContext = createContext(null)
 
@@ -53,6 +53,17 @@ export function AuthProvider({ children }) {
         return data.user
     }, [])
 
+    const loginWithGoogle = useCallback(async (code, redirectUri) => {
+        const data = await apiLoginWithGoogle(code, redirectUri)
+        sessionStorage.setItem('accessToken', data.accessToken)
+        sessionStorage.setItem('refreshToken', data.refreshToken)
+        sessionStorage.setItem('user', JSON.stringify(data.user))
+        setToken(data.accessToken)
+        setRefreshToken(data.refreshToken)
+        setUser(data.user)
+        return data.user
+    }, [])
+
     const register = useCallback(async (payload) => {
         const data = await apiRegister(payload)
         return data
@@ -83,7 +94,7 @@ export function AuthProvider({ children }) {
     )
 
     return (
-        <AuthContext.Provider value={{ user, token, refreshToken, login, logout, register, refreshUser, isAuthenticated, hasRole, loading }}>
+        <AuthContext.Provider value={{ user, token, refreshToken, login, loginWithGoogle, logout, register, refreshUser, isAuthenticated, hasRole, loading }}>
             {children}
         </AuthContext.Provider>
     )
