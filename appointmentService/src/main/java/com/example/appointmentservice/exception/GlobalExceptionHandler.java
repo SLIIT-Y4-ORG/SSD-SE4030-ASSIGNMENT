@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,6 +14,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // V-03 fix: logger for server-side recording of unexpected exceptions.
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex) {
@@ -40,9 +45,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    /**
+     * V-03 fix (CWE-209): Downstream microservice unavailable.
+     * Returns HTTP 503 with only the static safe message stored in the exception.
+     * The message is always set to a literal string by the service layer — never
+     * derived from ex.getMessage() of the underlying cause.
+     */
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<?> handleServiceUnavailable(ServiceUnavailableException ex) {
+        log.error("Downstream service unavailable", ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    /**
+     * V-03 fix (CWE-209): Do not return ex.getMessage() to the client.
+     * Internal details such as hostnames, ports and database constraint names
+     * contained in exception messages must not be disclosed over HTTP.
+     * The full exception is logged server-side for operator visibility.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleOther(Exception ex) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        log.error("Unhandled exception in appointment service", ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
 
     private ResponseEntity<Map<String, Object>> build(HttpStatus status, String message) {

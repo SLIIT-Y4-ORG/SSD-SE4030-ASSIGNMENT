@@ -1,25 +1,29 @@
-FROM eclipse-temurin:17-jdk-alpine
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-# Copy the Maven wrapper and pom.xml first for better caching
-COPY .mvn .mvn
-COPY mvnw .
-COPY mvnw.cmd .
+# Copy pom.xml first to improve dependency caching
 COPY pom.xml .
 
-# Make Maven wrapper executable
-RUN chmod +x ./mvnw
-
 # Download dependencies
-RUN ./mvnw dependency:go-offline -B
+RUN mvn dependency:go-offline -B
 
 # Copy source code
-COPY src src
+COPY src ./src
 
 # Build the application
-RUN ./mvnw clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B
 
-# Run the application with proper JVM settings for Cloud Run
+
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+# Copy the built application from the build stage
+COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8080
-CMD ["sh", "-c", "java -server -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -Dspring.jmx.enabled=false -Djava.security.egd=file:/dev/./urandom -Dserver.address=0.0.0.0 -Dserver.port=${PORT:-8080} -jar target/*.jar"]
+
+CMD ["sh", "-c", "java -server -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -Dspring.jmx.enabled=false -Djava.security.egd=file:/dev/./urandom -Dserver.address=0.0.0.0 -Dserver.port=${PORT:-8080} -jar app.jar"]

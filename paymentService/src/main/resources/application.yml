@@ -42,7 +42,7 @@ stripe:
 
 payment:
   security:
-    internal-api-key: ${PAYMENT_INTERNAL_API_KEY:change-me-before-deploy}
+    internal-api-key: ${PAYMENT_INTERNAL_API_KEY}
     internal-auth-enabled: ${PAYMENT_INTERNAL_AUTH_ENABLED:true}
 
 management:

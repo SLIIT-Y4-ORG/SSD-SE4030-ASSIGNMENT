@@ -1,5 +1,7 @@
 package com.example.paymentservice.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,6 +15,9 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // V-04 fix: server-side audit log for auth events — never logs supplied or configured key values.
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage());
@@ -23,9 +28,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    /**
+     * V-04 fix (CWE-798): Return a static "Unauthorized" message instead of ex.getMessage().
+     * ex.getMessage() from InternalAuthService may contain implementation details
+     * such as the header name or auth-state description. The supplied or configured
+     * API key is never logged or returned.
+     */
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException ex) {
-        return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        log.warn("Unauthorized internal API request: {}", ex.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, "Unauthorized");
     }
 
     @ExceptionHandler(ExternalServiceException.class)
@@ -44,6 +56,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+        log.error("Unhandled exception in payment service", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
     }
 
