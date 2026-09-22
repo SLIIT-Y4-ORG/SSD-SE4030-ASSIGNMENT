@@ -5,6 +5,8 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.example.appointmentservice.client.PaymentServiceClient;
@@ -13,7 +15,9 @@ import com.example.appointmentservice.client.PaymentServiceClient.PaymentSession
 import com.example.appointmentservice.dto.AppointmentResponse;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
 import com.example.appointmentservice.exception.BadRequestException;
+import com.example.appointmentservice.exception.DownstreamDependencyException;
 import com.example.appointmentservice.exception.ResourceNotFoundException;
+import com.example.appointmentservice.exception.ServiceUnavailableException;
 import com.example.appointmentservice.model.Appointment;
 import com.example.appointmentservice.model.AppointmentStatus;
 import com.example.appointmentservice.model.PaymentStatus;
@@ -22,6 +26,9 @@ import com.example.appointmentservice.util.AppointmentMapper;
 
 @Service
 public class AppointmentServiceImpl implements AppointmentService {
+
+    // V-03 fix: server-side logger — never forward to client
+    private static final Logger log = LoggerFactory.getLogger(AppointmentServiceImpl.class);
 
     private final AppointmentRepository appointmentRepository;
     private final PaymentServiceClient paymentServiceClient;
@@ -46,23 +53,29 @@ public class AppointmentServiceImpl implements AppointmentService {
             throw new BadRequestException("This slot is already confirmed");
         }
 
-        // Validate patient & doctor exist in their respective services
+        // V-03 fix (CWE-209): Validate patient exists.
+        // PatientServiceClient distinguishes genuine 404 (null) from downstream
+        // failures (DownstreamDependencyException). Only static safe strings are
+        // used in client-facing exceptions; full details are logged server-side.
         try {
             var patient = patientServiceClient.getPatientById(request.getPatientId());
             if (patient == null) {
-                throw new ResourceNotFoundException("Patient not found: " + request.getPatientId());
+                throw new ResourceNotFoundException("Patient not found");
             }
-        } catch (RuntimeException ex) {
-            throw new ResourceNotFoundException("Patient validation failed: " + ex.getMessage());
+        } catch (DownstreamDependencyException ex) {
+            log.error("Patient service call failed for patient {}", request.getPatientId(), ex);
+            throw new ServiceUnavailableException("Unable to validate patient at this time");
         }
 
+        // V-03 fix (CWE-209): Validate doctor exists.
         try {
             var doctor = doctorServiceClient.getDoctorById(request.getDoctorId());
             if (doctor == null) {
-                throw new ResourceNotFoundException("Doctor not found: " + request.getDoctorId());
+                throw new ResourceNotFoundException("Doctor not found");
             }
-        } catch (RuntimeException ex) {
-            throw new ResourceNotFoundException("Doctor validation failed: " + ex.getMessage());
+        } catch (DownstreamDependencyException ex) {
+            log.error("Doctor service call failed for doctor {}", request.getDoctorId(), ex);
+            throw new ServiceUnavailableException("Unable to validate doctor at this time");
         }
 
         Appointment appointment = new Appointment();

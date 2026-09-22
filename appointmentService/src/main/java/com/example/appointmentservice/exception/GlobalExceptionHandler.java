@@ -46,6 +46,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * V-03 fix (CWE-209): Downstream microservice unavailable.
+     * Returns HTTP 503 with only the static safe message stored in the exception.
+     * The message is always set to a literal string by the service layer — never
+     * derived from ex.getMessage() of the underlying cause.
+     */
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<?> handleServiceUnavailable(ServiceUnavailableException ex) {
+        log.error("Downstream service unavailable", ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    /**
      * V-03 fix (CWE-209): Do not return ex.getMessage() to the client.
      * Internal details such as hostnames, ports and database constraint names
      * contained in exception messages must not be disclosed over HTTP.
