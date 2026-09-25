@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.example.appointmentservice.exception.UnauthorizedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,6 +56,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleServiceUnavailable(ServiceUnavailableException ex) {
         log.error("Downstream service unavailable", ex);
         return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    /**
+     * Token-propagation fix: missing, blank, or malformed Authorization header.
+     * Returns HTTP 401 with a static safe message.
+     * The header value is never logged.
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<?> handleUnauthorized(UnauthorizedException ex) {
+        log.warn("Unauthorized request to appointment service: {}", ex.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, "Authentication required");
     }
 
     /**

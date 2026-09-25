@@ -85,8 +85,8 @@ public class PaymentServiceClient {
         @JsonProperty("sessionId")
         public String sessionId;
         
-        @JsonProperty("checkoutUrl")
-        public String checkoutUrl;
+        @JsonProperty("url")
+public String checkoutUrl;
         
         @JsonProperty("status")
         public String status;

@@ -5,18 +5,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.appointmentservice.dto.AppointmentResponse;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
 import com.example.appointmentservice.dto.RescheduleAppointmentRequest;
+import com.example.appointmentservice.security.AuthorizationHeaderValidator;
 import com.example.appointmentservice.service.AppointmentService;
 
 import jakarta.validation.Valid;
@@ -26,15 +29,29 @@ import jakarta.validation.Valid;
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
+    private final AuthorizationHeaderValidator authorizationHeaderValidator;
 
-    public AppointmentController(AppointmentService appointmentService) {
+    public AppointmentController(AppointmentService appointmentService,
+                                 AuthorizationHeaderValidator authorizationHeaderValidator) {
         this.appointmentService = appointmentService;
+        this.authorizationHeaderValidator = authorizationHeaderValidator;
     }
 
+    /**
+     * Create an appointment.
+     *
+     * required=false so that a missing header reaches this method and is
+     * rejected by {@link AuthorizationHeaderValidator} with HTTP 401 rather
+     * than Spring returning HTTP 400 before the method executes.
+     * A null, blank, or non-Bearer header all produce HTTP 401 before any
+     * downstream service (Patient, Doctor) is called.
+     */
     @PostMapping
     public ResponseEntity<AppointmentResponse> createAppointment(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
             @Valid @RequestBody CreateAppointmentRequest request) {
-        return ResponseEntity.ok(appointmentService.createAppointment(request));
+        authorizationHeaderValidator.validate(authorizationHeader);
+        return ResponseEntity.ok(appointmentService.createAppointment(request, authorizationHeader));
     }
 
     @GetMapping("/{id}")

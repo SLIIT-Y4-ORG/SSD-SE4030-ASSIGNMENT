@@ -146,4 +146,44 @@ class GlobalExceptionHandlerSecurityTest {
         assertThat(response.getStatusCode()).isNotEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
+
+    // ── Test 5: UnauthorizedException → HTTP 401 ─────────────────────────────
+
+
+    @Test
+    @DisplayName("UnauthorizedException returns HTTP 401 with static safe message")
+    void unauthorizedExceptionReturns401() {
+        UnauthorizedException ex = new UnauthorizedException("Authentication required");
+
+        ResponseEntity<?> response = exceptionHandler.handleUnauthorized(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.get("status")).isEqualTo(401);
+        assertThat(body.get("message")).isEqualTo("Authentication required");
+    }
+
+    @Test
+    @DisplayName("401 response body does not contain the header value or any token")
+    void unauthorizedResponseDoesNotLeakHeaderValue() {
+        // Simulate a case where the exception was created with a safe static message
+        // (the header value itself must never appear in the message or response)
+        UnauthorizedException ex = new UnauthorizedException("Authentication required");
+
+        ResponseEntity<?> response = exceptionHandler.handleUnauthorized(ex);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        String fullBody = body.toString();
+
+        // Safe static message only
+        assertThat(fullBody).contains("Authentication required");
+        // Must not contain any auth scheme or token fragments
+        assertThat(fullBody).doesNotContain("Bearer");
+        assertThat(fullBody).doesNotContain("Basic");
+    }
 }
+

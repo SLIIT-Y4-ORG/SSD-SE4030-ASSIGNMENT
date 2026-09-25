@@ -1,7 +1,6 @@
 package com.example.appointmentservice.service;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,8 +16,8 @@ import com.example.appointmentservice.client.DoctorServiceClient;
 import com.example.appointmentservice.client.PatientServiceClient;
 import com.example.appointmentservice.client.PaymentServiceClient;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
-import com.example.appointmentservice.dto.PatientDto;
 import com.example.appointmentservice.dto.DoctorDto;
+import com.example.appointmentservice.dto.PatientDto;
 import com.example.appointmentservice.exception.DownstreamDependencyException;
 import com.example.appointmentservice.exception.ResourceNotFoundException;
 import com.example.appointmentservice.exception.ServiceUnavailableException;
@@ -27,20 +26,25 @@ import com.example.appointmentservice.repository.AppointmentRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-
 /**
- * V-03 (CWE-209): AppointmentServiceImpl security tests.
+ * V-03 (CWE-209) + Token-propagation fix: AppointmentServiceImpl security tests.
  *
  * Verifies that:
- * A. Genuine null from PatientServiceClient → ResourceNotFoundException (404).
- * B. DownstreamDependencyException from PatientServiceClient → ServiceUnavailableException (503).
- * C. ServiceUnavailableException message contains only the static safe string.
+ * VI. AppointmentServiceImpl passes the Authorization header to PatientServiceClient.
+ * VII. AppointmentServiceImpl passes the Authorization header to DoctorServiceClient.
+ * A.  Genuine null from PatientServiceClient → ResourceNotFoundException (404).
+ * B.  DownstreamDependencyException from PatientServiceClient → ServiceUnavailableException (503).
+ * C.  ServiceUnavailableException message contains only the static safe string.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("V-03: AppointmentServiceImpl security tests")
+@DisplayName("V-03 + Token propagation: AppointmentServiceImpl security tests")
 class AppointmentServiceImplSecurityTest {
+
+    private static final String AUTH_HEADER = "Bearer test-token-abc123";
 
     @Mock
     private AppointmentRepository appointmentRepository;
@@ -69,14 +73,48 @@ class AppointmentServiceImplSecurityTest {
         when(appointmentRepository.existsBySlotIdAndStatus(any(), any())).thenReturn(false);
     }
 
+    // ── Test VI: Authorization header is passed to PatientServiceClient ────────
+
+    @Test
+    @DisplayName("AppointmentServiceImpl passes Authorization header to PatientServiceClient")
+    void passesAuthHeaderToPatientServiceClient() {
+        when(patientServiceClient.getPatientById(any(), eq(AUTH_HEADER)))
+                .thenReturn(new PatientDto());
+        when(doctorServiceClient.getDoctorById(any(), eq(AUTH_HEADER)))
+                .thenReturn(null); // triggers ResourceNotFoundException, but header was forwarded
+
+        try {
+            service.createAppointment(validRequest, AUTH_HEADER);
+        } catch (Exception ignored) { /* not testing the full flow here */ }
+
+        verify(patientServiceClient).getPatientById(validRequest.getPatientId(), AUTH_HEADER);
+    }
+
+    // ── Test VII: Authorization header is passed to DoctorServiceClient ────────
+
+    @Test
+    @DisplayName("AppointmentServiceImpl passes Authorization header to DoctorServiceClient")
+    void passesAuthHeaderToDoctorServiceClient() {
+        when(patientServiceClient.getPatientById(any(), eq(AUTH_HEADER)))
+                .thenReturn(new PatientDto());
+        when(doctorServiceClient.getDoctorById(any(), eq(AUTH_HEADER)))
+                .thenReturn(null); // triggers ResourceNotFoundException
+
+        try {
+            service.createAppointment(validRequest, AUTH_HEADER);
+        } catch (Exception ignored) { /* not testing the full flow here */ }
+
+        verify(doctorServiceClient).getDoctorById(validRequest.getDoctorId(), AUTH_HEADER);
+    }
+
     // ── Test A: Genuine 404 (patient does not exist) ───────────────────────────
 
     @Test
     @DisplayName("Genuine patient 404 (null return) produces ResourceNotFoundException")
     void genuinePatient404ProducesResourceNotFound() {
-        when(patientServiceClient.getPatientById(any())).thenReturn(null);
+        when(patientServiceClient.getPatientById(any(), any())).thenReturn(null);
 
-        assertThatThrownBy(() -> service.createAppointment(validRequest))
+        assertThatThrownBy(() -> service.createAppointment(validRequest, AUTH_HEADER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Patient not found");
     }
@@ -84,10 +122,10 @@ class AppointmentServiceImplSecurityTest {
     @Test
     @DisplayName("Genuine doctor 404 (null return) produces ResourceNotFoundException")
     void genuineDoctor404ProducesResourceNotFound() {
-        when(patientServiceClient.getPatientById(any())).thenReturn(new PatientDto());
-        when(doctorServiceClient.getDoctorById(any())).thenReturn(null);
+        when(patientServiceClient.getPatientById(any(), any())).thenReturn(new PatientDto());
+        when(doctorServiceClient.getDoctorById(any(), any())).thenReturn(null);
 
-        assertThatThrownBy(() -> service.createAppointment(validRequest))
+        assertThatThrownBy(() -> service.createAppointment(validRequest, AUTH_HEADER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Doctor not found");
     }
@@ -101,9 +139,9 @@ class AppointmentServiceImplSecurityTest {
                 "Patient service unavailable",
                 new ResourceAccessException("Connection refused: http://patient-service:8080"));
 
-        when(patientServiceClient.getPatientById(any())).thenThrow(downstreamEx);
+        when(patientServiceClient.getPatientById(any(), any())).thenThrow(downstreamEx);
 
-        assertThatThrownBy(() -> service.createAppointment(validRequest))
+        assertThatThrownBy(() -> service.createAppointment(validRequest, AUTH_HEADER))
                 .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessage("Unable to validate patient at this time");
     }
@@ -111,14 +149,14 @@ class AppointmentServiceImplSecurityTest {
     @Test
     @DisplayName("Doctor service connection failure → ServiceUnavailableException")
     void doctorConnectionFailureProducesServiceUnavailable() {
-        when(patientServiceClient.getPatientById(any())).thenReturn(new PatientDto());
+        when(patientServiceClient.getPatientById(any(), any())).thenReturn(new PatientDto());
         DownstreamDependencyException downstreamEx = new DownstreamDependencyException(
                 "Doctor service unavailable",
                 new ResourceAccessException("Connection refused: http://doctor-service:8082"));
 
-        when(doctorServiceClient.getDoctorById(any())).thenThrow(downstreamEx);
+        when(doctorServiceClient.getDoctorById(any(), any())).thenThrow(downstreamEx);
 
-        assertThatThrownBy(() -> service.createAppointment(validRequest))
+        assertThatThrownBy(() -> service.createAppointment(validRequest, AUTH_HEADER))
                 .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessage("Unable to validate doctor at this time");
     }
@@ -134,12 +172,12 @@ class AppointmentServiceImplSecurityTest {
                         "I/O error on GET http://patient-service:8080/api/patients/123 "
                         + "500 Internal Server Error: {\"db\": \"connection failed\"}"));
 
-        when(patientServiceClient.getPatientById(any())).thenThrow(downstreamEx);
+        when(patientServiceClient.getPatientById(any(), any())).thenThrow(downstreamEx);
 
         ServiceUnavailableException thrown = (ServiceUnavailableException)
                 org.junit.jupiter.api.Assertions.assertThrows(
                         ServiceUnavailableException.class,
-                        () -> service.createAppointment(validRequest));
+                        () -> service.createAppointment(validRequest, AUTH_HEADER));
 
         String msg = thrown.getMessage();
         assertThat(msg).doesNotContain("patient-service");
@@ -149,5 +187,4 @@ class AppointmentServiceImplSecurityTest {
         assertThat(msg).doesNotContain("Internal Server Error");
         assertThat(msg).doesNotContain("connection failed");
     }
-
 }

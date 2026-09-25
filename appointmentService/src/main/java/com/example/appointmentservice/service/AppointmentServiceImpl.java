@@ -46,7 +46,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
-    public AppointmentResponse createAppointment(CreateAppointmentRequest request) {
+    public AppointmentResponse createAppointment(CreateAppointmentRequest request, String authorizationHeader) {
         validateCreateRequest(request);
 
         if (appointmentRepository.existsBySlotIdAndStatus(request.getSlotId(), AppointmentStatus.CONFIRMED)) {
@@ -58,7 +58,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         // failures (DownstreamDependencyException). Only static safe strings are
         // used in client-facing exceptions; full details are logged server-side.
         try {
-            var patient = patientServiceClient.getPatientById(request.getPatientId());
+            var patient = patientServiceClient.getPatientById(request.getPatientId(), authorizationHeader);
             if (patient == null) {
                 throw new ResourceNotFoundException("Patient not found");
             }
@@ -69,7 +69,7 @@ public class AppointmentServiceImpl implements AppointmentService {
 
         // V-03 fix (CWE-209): Validate doctor exists.
         try {
-            var doctor = doctorServiceClient.getDoctorById(request.getDoctorId());
+            var doctor = doctorServiceClient.getDoctorById(request.getDoctorId(), authorizationHeader);
             if (doctor == null) {
                 throw new ResourceNotFoundException("Doctor not found");
             }
