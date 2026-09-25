@@ -112,6 +112,270 @@ This repository contains the security-hardened **ClinicMate** healthcare microse
 
 ---
 
+### Individual Contribution: K.L. Widanagama (It22629562)
+
+#### 1. Vulnerability 1: Raw Exception-Message and Internal-Information Disclosure
+
+* **Risk Level:** Medium (CVSS: 5.3)
+
+* **OWASP Top 10 Category:** A05:2021 – Security Misconfiguration
+
+* **CWE ID:** [CWE-209: Generation of Error Message Containing Sensitive Information](https://cwe.mitre.org/data/definitions/209.html)
+
+* **Affected Component:** `appointmentService` – global exception handling and downstream Patient/Doctor service clients
+
+* **Vulnerability Description & Impact:**
+  The original Appointment Service returned raw Java exception messages to HTTP clients. When communication with the Patient Service or Doctor Service failed, exception messages could contain internal service names, URLs, port numbers, downstream response bodies, database details, and other implementation information. For example, a connection failure could disclose an internal address such as `http://patient-service:8080`. An attacker could use this information to understand the internal microservice topology, identify technologies and endpoints, and plan further targeted attacks.
+
+* **Evidence from the Original Implementation:**
+  The original catch-all exception handler returned `ex.getMessage()` directly:
+
+  ```java
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<Map<String, Object>> handleOther(Exception ex) {
+      return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+  }
+  ```
+
+  Downstream exceptions were also wrapped using their original messages:
+
+  ```java
+  throw new RuntimeException("Failed to fetch patient: " + ex.getMessage());
+  ```
+
+  This allowed internal exception details to travel from the downstream client, through the service layer and global exception handler, into the HTTP response.
+
+* **Remediation:**
+  The exception-handling flow was redesigned to prevent internal information from reaching clients:
+
+  1. Replaced raw catch-all exception responses with a generic message:
+
+     ```json
+     {
+       "message": "An unexpected error occurred"
+     }
+     ```
+  2. Added `DownstreamDependencyException` to represent communication failures involving downstream services.
+  3. Added `ServiceUnavailableException` for safe client-facing dependency-failure responses.
+  4. Distinguished genuine HTTP `404 Not Found` responses from downstream `5xx`, timeout, and connection failures.
+  5. Mapped downstream dependency failures to HTTP `503 Service Unavailable` with a static safe message:
+
+     ```json
+     {
+       "error": "Service Unavailable",
+       "message": "Unable to validate patient at this time",
+       "status": 503
+     }
+     ```
+  6. Applied the same safe handling to both `PatientServiceClient` and `DoctorServiceClient`.
+  7. Preserved complete exception details in restricted server-side logs using SLF4J, allowing troubleshooting without exposing details to external clients.
+  8. Added security tests confirming that internal URLs, ports, downstream response bodies, and exception details are not returned.
+  9. Forwarded the authenticated user’s `Authorization` header to the Patient and Doctor services so legitimate validation requests function correctly. The bearer token is not stored, included in exception messages, or intentionally logged.
+
+* **Key Files Modified:**
+
+  * `appointmentService/src/main/java/com/example/appointmentservice/client/PatientServiceClient.java`
+  * `appointmentService/src/main/java/com/example/appointmentservice/client/DoctorServiceClient.java`
+  * `appointmentService/src/main/java/com/example/appointmentservice/exception/GlobalExceptionHandler.java`
+  * `appointmentService/src/main/java/com/example/appointmentservice/exception/DownstreamDependencyException.java`
+  * `appointmentService/src/main/java/com/example/appointmentservice/exception/ServiceUnavailableException.java`
+  * `appointmentService/src/main/java/com/example/appointmentservice/service/AppointmentServiceImpl.java`
+  * Relevant controller, authorization-validation, and security-test files
+
+* **Verification:**
+
+  1. Automated security tests were executed:
+
+     ```bash
+     mvn clean test -Dtest="PatientServiceClientSecurityTest,DoctorServiceClientSecurityTest,AppointmentServiceImplSecurityTest,GlobalExceptionHandlerSecurityTest" -f appointmentService/pom.xml
+     ```
+  2. All relevant V-03 security tests completed successfully with no failures.
+  3. The Patient Service was stopped to simulate a downstream dependency failure:
+
+     ```bash
+     docker compose stop patient-service
+     ```
+  4. An appointment-creation request was sent through the frontend/API.
+  5. The response returned HTTP `503` with:
+
+     ```json
+     {
+       "message": "Unable to validate patient at this time"
+     }
+     ```
+  6. The client response did not contain `patient-service`, `8080`, internal URLs, stack traces, or downstream response bodies.
+  7. The complete exception and original cause remained available only in the Appointment Service logs:
+
+     ```bash
+     docker compose logs --tail=200 appointment-service
+     ```
+  8. After restarting the Patient Service, normal appointment creation worked:
+
+     ```bash
+     docker compose start patient-service
+     ```
+
+* **Before Remediation:**
+
+  ```json
+  {
+    "message": "Patient validation failed: Failed to fetch patient: 500 on GET request for \"http://patient-service:8080/api/patients/...\""
+  }
+  ```
+
+* **After Remediation:**
+
+  ```json
+  {
+    "error": "Service Unavailable",
+    "message": "Unable to validate patient at this time",
+    "status": 503
+  }
+  ```
+
+* **Status:** Fixed and verified.
+
+* **Git Commit:** `[INSERT V-03 COMMIT HASH]` (`fix(security): prevent raw exception detail disclosure`)
+
+---
+
+#### 2. Vulnerability 2: Hard-Coded Internal Payment API Credential
+
+* **Risk Level:** High (CVSS: 8.1)
+
+* **OWASP Top 10 Category:** A07:2021 – Identification and Authentication Failures
+
+* **CWE ID:** [CWE-798: Use of Hard-coded Credentials](https://cwe.mitre.org/data/definitions/798.html)
+
+* **Affected Components:** `appointmentService` and `paymentService` internal payment authentication
+
+* **Vulnerability Description & Impact:**
+  The original application stored an internal payment API key as a default value in tracked configuration. The Appointment Service used this credential when requesting payment sessions from the Payment Service. The Payment Service also contained a predictable fallback value. Because the credential was included in version-controlled source code, anyone with repository access or access to leaked repository history could obtain it and attempt unauthorized requests against internal payment endpoints.
+
+  Hard-coded credentials are difficult to rotate, are frequently reused between environments, and remain recoverable from Git history even after removal from the latest source version.
+
+* **Evidence from the Original Implementation:**
+  The tracked configuration contained credential defaults similar to:
+
+  ```yaml
+  internal-api-key: ${PAYMENT_INTERNAL_API_KEY:[REDACTED_HISTORICAL_KEY]}
+  ```
+
+  and:
+
+  ```yaml
+  internal-api-key: ${PAYMENT_INTERNAL_API_KEY:change-me-before-deploy}
+  ```
+
+  These defaults allowed the services to start and authenticate using credentials stored directly in the repository.
+
+* **Remediation:**
+  The internal credential configuration and authentication flow were secured as follows:
+
+  1. Removed the hard-coded Base64 credential and all predictable fallback values from tracked configuration.
+  2. Updated both services to obtain the key exclusively from the runtime environment:
+
+     ```yaml
+     internal-api-key: ${PAYMENT_INTERNAL_API_KEY}
+     ```
+  3. Added `.env.example` files containing documentation and placeholders only:
+
+     ```env
+     PAYMENT_INTERNAL_API_KEY=replace-with-a-strong-random-secret
+     ```
+  4. Ensured real `.env` files are excluded through `.gitignore` and remain untracked.
+  5. Added `AppointmentStartupValidator` so Appointment Service terminates during startup if the key is missing or blank.
+  6. Added validation to `PaymentSecurityProperties` so Payment Service terminates if internal authentication is enabled without a valid key.
+  7. Enabled internal authentication using:
+
+     ```env
+     PAYMENT_INTERNAL_AUTH_ENABLED=true
+     ```
+  8. Used constant-time comparison through `MessageDigest.isEqual()` to validate the provided and configured keys.
+  9. Added safe HTTP `401 Unauthorized` handling for missing or invalid credentials without returning or logging the credential value.
+  10. Added automated tests covering missing keys, blank keys, disabled authentication, incorrect keys, and valid configuration.
+  11. Verified that no real key is present in tracked files or the staged Git diff.
+  12. Documented that the previously exposed historical credential must be revoked and replaced because deleting it from the current YAML does not remove it from Git history.
+
+* **Key Files Modified:**
+
+  * `appointmentService/src/main/resources/application.yml`
+  * `appointmentService/src/main/java/com/example/appointmentservice/config/AppointmentStartupValidator.java`
+  * `appointmentService/.env.example`
+  * `paymentService/src/main/resources/application.yml`
+  * `paymentService/src/main/java/com/example/paymentservice/config/PaymentSecurityProperties.java`
+  * `paymentService/src/main/java/com/example/paymentservice/service/InternalAuthService.java`
+  * `paymentService/src/main/java/com/example/paymentservice/exception/GlobalExceptionHandler.java`
+  * `paymentService/.env.example`
+  * Relevant startup-validation and security-test files
+
+* **Verification:**
+
+  1. Appointment Service security tests were executed:
+
+     ```bash
+     mvn test -Dtest="AppointmentStartupValidatorTest" -f appointmentService/pom.xml
+     ```
+  2. Payment Service security tests were executed:
+
+     ```bash
+     mvn test -Dtest="PaymentSecurityPropertiesTest,InternalPaymentControllerSecurityTest" -f paymentService/pom.xml
+     ```
+  3. Starting Appointment Service with a missing or blank key caused immediate startup failure:
+
+     ```text
+     java.lang.IllegalStateException:
+     PAYMENT_INTERNAL_API_KEY environment variable is required and must not be blank
+     ```
+  4. Starting Payment Service with internal authentication enabled and a blank key also caused startup failure.
+  5. A payment-session request containing an incorrect internal API key returned:
+
+     ```http
+     HTTP/1.1 401 Unauthorized
+     ```
+
+     ```json
+     {
+       "error": "Unauthorized",
+       "message": "Unauthorized",
+       "status": 401
+     }
+     ```
+  6. A request containing the correct runtime key returned HTTP `201 Created` and generated a Stripe Checkout session:
+
+     ```http
+     HTTP/1.1 201 Created
+     ```
+
+     ```json
+     {
+       "sessionId": "cs_test_...",
+       "url": "https://checkout.stripe.com/...",
+       "status": "PENDING"
+     }
+     ```
+  7. Git checks confirmed that real `.env` files were not tracked:
+
+     ```bash
+     git ls-files | grep -E '(^|/)\.env$'
+     ```
+
+     Expected result: no output.
+  8. A tracked-file search found only safe placeholder values in `.env.example` files:
+
+     ```env
+     PAYMENT_INTERNAL_API_KEY=replace-with-a-strong-random-secret
+     ```
+  9. End-to-end testing confirmed that Appointment Service could securely request a payment session when both services used the same runtime key.
+
+* **Security Limitation and Required Follow-up:**
+  The key previously stored in the repository must be considered compromised. Removing it from the latest source version does not remove it from earlier Git commits. Therefore, the historical credential must be revoked and replaced with a newly generated secret in all deployment environments.
+
+* **Status:** Fixed and verified. Historical credential rotation remains required.
+
+* **Git Commit:** `[INSERT V-04 COMMIT HASH]` (`fix(security): remove hard-coded internal payment credentials`)
+
+
 ## Architecture & Technology Stack
 
 - **Frontend Client:** React 18, React Router v6, Axios, Vite, Nginx (Alpine Linux) — Port `5173`
