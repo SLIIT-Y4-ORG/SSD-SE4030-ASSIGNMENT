@@ -9,7 +9,8 @@ import com.example.appointmentservice.dto.CreateAppointmentRequest;
 
 public interface AppointmentService {
 
-    AppointmentResponse createAppointment(CreateAppointmentRequest request);
+    AppointmentResponse createAppointment(CreateAppointmentRequest request, String authorizationHeader);
+
 
     AppointmentResponse getAppointmentById(UUID id);
 
