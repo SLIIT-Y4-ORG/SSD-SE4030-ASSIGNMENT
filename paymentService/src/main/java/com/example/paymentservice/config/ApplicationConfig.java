@@ -3,7 +3,9 @@ package com.example.paymentservice.config;
 import com.stripe.Stripe;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 
 @Configuration
 @EnableConfigurationProperties(StripeProperties.class)
@@ -24,5 +26,14 @@ public class ApplicationConfig {
             Stripe.setReadTimeout(20_000);
             Stripe.setMaxNetworkRetries(1);
         }
+    }
+
+    /**
+     * C-7 fix (CWE-306): RestTemplate used by UserServiceClient to call userService
+     * GET /api/auth/validate for Bearer token validation on public PaymentController endpoints.
+     */
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
 }
