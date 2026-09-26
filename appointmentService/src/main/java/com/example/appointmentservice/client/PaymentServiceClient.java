@@ -1,7 +1,7 @@
 package com.example.appointmentservice.client;
 
 import java.util.UUID;
-
+import com.example.appointmentservice.exception.DownstreamDependencyException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -47,7 +47,10 @@ public class PaymentServiceClient {
             return response;
         } catch (Exception e) {
             log.error("Error creating payment session: ", e);
-            throw new RuntimeException("Failed to create payment session: " + e.getMessage(), e);
+            throw new DownstreamDependencyException(
+        "Payment service unavailable",
+        e
+);
         }
     }
 
