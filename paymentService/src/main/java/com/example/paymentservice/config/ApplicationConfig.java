@@ -28,10 +28,6 @@ public class ApplicationConfig {
         }
     }
 
-    /**
-     * C-7 fix (CWE-306): RestTemplate used by UserServiceClient to call userService
-     * GET /api/auth/validate for Bearer token validation on public PaymentController endpoints.
-     */
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();

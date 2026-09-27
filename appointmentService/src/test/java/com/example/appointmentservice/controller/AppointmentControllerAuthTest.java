@@ -1,11 +1,13 @@
  package com.example.appointmentservice.controller;
 
-import com.example.appointmentservice.client.UserServiceClient;
-import com.example.appointmentservice.client.UserServiceClient.TokenInfo;
+import com.example.appointmentservice.client.DoctorServiceClient;
+import com.example.appointmentservice.client.PatientServiceClient;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
+import com.example.appointmentservice.dto.TokenValidationResponse;
 import com.example.appointmentservice.exception.UnauthorizedException;
-import com.example.appointmentservice.security.AuthHelper;
 import com.example.appointmentservice.service.AppointmentService;
+import com.example.appointmentservice.util.AuthHelper;
+import com.example.appointmentservice.util.InternalAuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,29 +24,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for Authorization header enforcement in {@link AppointmentController}.
- *
- * The controller method is called directly (not via MockMvc) because
- * {@code @WebMvcTest} is not available in this module's test classpath.
- * HTTP status mapping (UnauthorizedException → 401) is covered separately by
- * {@link com.example.appointmentservice.exception.GlobalExceptionHandlerSecurityTest}.
- *
- * Tests use a mock {@link UserServiceClient} so that format-rejection cases
- * (null, blank, non-Bearer) never reach the network — they are rejected by
- * {@link AuthHelper#requireBearer} before the client is invoked.
- * The "valid token" case stubs the client to return a real {@link TokenInfo}.
- *
- * Verifies that:
- * 1. Missing (null) header → UnauthorizedException before service is called.
- * 2. Blank header → UnauthorizedException before service is called.
- * 3. Non-Bearer header → UnauthorizedException before service is called.
- * 4. "Bearer " with no token → UnauthorizedException before service is called.
- * 5. Valid Bearer token → service.createAppointment() is called.
- * 6. UnauthorizedException message never echoes the header value (no info leakage).
- *
- * All token values are dummies.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AppointmentController: Authorization header enforcement")
 class AppointmentControllerAuthTest {
@@ -55,15 +34,24 @@ class AppointmentControllerAuthTest {
     private AppointmentService appointmentService;
 
     @Mock
-    private UserServiceClient userServiceClient;
+    private AuthHelper authHelper;
+
+    @Mock
+    private PatientServiceClient patientServiceClient;
+
+    @Mock
+    private DoctorServiceClient doctorServiceClient;
+
+    @Mock
+    private InternalAuthService internalAuthService;
 
     private AppointmentController controller;
     private CreateAppointmentRequest validRequest;
 
     @BeforeEach
     void setup() {
-        AuthHelper authHelper = new AuthHelper(userServiceClient);
-        controller = new AppointmentController(appointmentService, authHelper);
+        controller = new AppointmentController(
+                appointmentService, authHelper, patientServiceClient, doctorServiceClient, internalAuthService);
 
         validRequest = new CreateAppointmentRequest();
         validRequest.setPatientId(UUID.randomUUID());
@@ -78,14 +66,16 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("Missing Authorization header → UnauthorizedException, service not called")
     void missingHeaderThrowsUnauthorizedAndServiceNotCalled() {
+        when(authHelper.requireRole(null, "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment(null, validRequest))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Authentication required");
 
         // Service (and thus all downstream clients) is never reached
         verify(appointmentService, never()).createAppointment(any(), any());
-        // UserServiceClient is also never called — rejected by format check first
-        verify(userServiceClient, never()).validateToken(any());
+        verify(authHelper).requireRole(null, "PATIENT");
     }
 
     // ── 2. Blank header ───────────────────────────────────────────────────────
@@ -93,22 +83,28 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("Blank Authorization header → UnauthorizedException, service not called")
     void blankHeaderThrowsUnauthorizedAndServiceNotCalled() {
+        when(authHelper.requireRole("   ", "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment("   ", validRequest))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Authentication required");
 
         verify(appointmentService, never()).createAppointment(any(), any());
-        verify(userServiceClient, never()).validateToken(any());
+        verify(authHelper).requireRole("   ", "PATIENT");
     }
 
     @Test
     @DisplayName("Empty Authorization header → UnauthorizedException, service not called")
     void emptyHeaderThrowsUnauthorizedAndServiceNotCalled() {
+        when(authHelper.requireRole("", "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment("", validRequest))
                 .isInstanceOf(UnauthorizedException.class);
 
         verify(appointmentService, never()).createAppointment(any(), any());
-        verify(userServiceClient, never()).validateToken(any());
+        verify(authHelper).requireRole("", "PATIENT");
     }
 
     // ── 3. Non-Bearer scheme ──────────────────────────────────────────────────
@@ -116,22 +112,28 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("Basic auth header → UnauthorizedException, service not called")
     void basicAuthHeaderThrowsUnauthorizedAndServiceNotCalled() {
+        when(authHelper.requireRole("Basic dXNlcjpwYXNz", "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment("Basic dXNlcjpwYXNz", validRequest))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Authentication required");
 
         verify(appointmentService, never()).createAppointment(any(), any());
-        verify(userServiceClient, never()).validateToken(any());
+        verify(authHelper).requireRole("Basic dXNlcjpwYXNz", "PATIENT");
     }
 
     @Test
     @DisplayName("Plain token without Bearer → UnauthorizedException, service not called")
     void noSchemeHeaderThrowsUnauthorized() {
+        when(authHelper.requireRole("raw-token-value", "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment("raw-token-value", validRequest))
                 .isInstanceOf(UnauthorizedException.class);
 
         verify(appointmentService, never()).createAppointment(any(), any());
-        verify(userServiceClient, never()).validateToken(any());
+        verify(authHelper).requireRole("raw-token-value", "PATIENT");
     }
 
     // ── 4. "Bearer " with no token ────────────────────────────────────────────
@@ -139,8 +141,8 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("\"Bearer \" with no token → still rejected by userService returning null")
     void bearerWithNoTokenThrowsUnauthorized() {
-        // "Bearer " passes the prefix check; userServiceClient returns null → 401
-        when(userServiceClient.validateToken(eq("Bearer "))).thenReturn(null);
+        when(authHelper.requireRole(eq("Bearer "), eq("PATIENT")))
+                .thenThrow(new UnauthorizedException("Authentication required"));
 
         assertThatThrownBy(() -> controller.createAppointment("Bearer ", validRequest))
                 .isInstanceOf(UnauthorizedException.class);
@@ -153,13 +155,17 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("Valid Bearer token → service.createAppointment() is called")
     void validTokenCallsService() {
-        TokenInfo fakeUser = new TokenInfo(UUID.randomUUID(), "PATIENT");
-        when(userServiceClient.validateToken(eq(VALID_TOKEN))).thenReturn(fakeUser);
+        TokenValidationResponse fakeUser = new TokenValidationResponse();
+        fakeUser.setValid(true);
+        fakeUser.setUserId(UUID.randomUUID());
+        fakeUser.setRole("PATIENT");
+        when(authHelper.requireRole(eq(VALID_TOKEN), eq("PATIENT"))).thenReturn(fakeUser);
         // Service returns null — ResponseEntity.ok(null) is fine for this test scope
         when(appointmentService.createAppointment(any(), any())).thenReturn(null);
 
         controller.createAppointment(VALID_TOKEN, validRequest);
 
+        verify(patientServiceClient).getPatientById(validRequest.getPatientId(), VALID_TOKEN);
         verify(appointmentService).createAppointment(validRequest, VALID_TOKEN);
     }
 
@@ -168,6 +174,9 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("UnauthorizedException message is the static safe string, not the header value")
     void exceptionMessageDoesNotEchoHeaderValue() {
+        when(authHelper.requireRole("Basic leakedValue", "PATIENT"))
+                .thenThrow(new UnauthorizedException("Authentication required"));
+
         assertThatThrownBy(() -> controller.createAppointment("Basic leakedValue", validRequest))
                 .isInstanceOf(UnauthorizedException.class)
                 .extracting(Throwable::getMessage)

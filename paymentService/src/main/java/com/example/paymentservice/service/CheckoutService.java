@@ -1,5 +1,6 @@
 package com.example.paymentservice.service;
 
+import com.example.paymentservice.client.AppointmentServiceClient;
 import com.example.paymentservice.config.StripeProperties;
 import com.example.paymentservice.dto.CreateCheckoutSessionRequest;
 import com.example.paymentservice.dto.CreateCheckoutSessionResponse;
@@ -34,15 +35,18 @@ public class CheckoutService {
     private final StripeProperties stripeProperties;
     private final PaymentProfileService paymentProfileService;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final AppointmentServiceClient appointmentServiceClient;
 
     public CheckoutService(
             StripeProperties stripeProperties,
             PaymentProfileService paymentProfileService,
-            PaymentTransactionRepository paymentTransactionRepository
+            PaymentTransactionRepository paymentTransactionRepository,
+            AppointmentServiceClient appointmentServiceClient
     ) {
         this.stripeProperties = stripeProperties;
         this.paymentProfileService = paymentProfileService;
         this.paymentTransactionRepository = paymentTransactionRepository;
+        this.appointmentServiceClient = appointmentServiceClient;
     }
 
     @Transactional
@@ -174,7 +178,17 @@ public class CheckoutService {
         }
 
         PaymentTransaction saved = paymentTransactionRepository.save(tx);
+        if (saved.getStatus() == PaymentStatus.COMPLETED && saved.getAppointmentId() != null) {
+            appointmentServiceClient.notifyPaymentCompleted(saved.getAppointmentId(), saved.getId());
+        }
         return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public UUID getTransactionUserId(String sessionId) {
+        return paymentTransactionRepository.findByStripeSessionId(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment transaction not found for session: " + sessionId))
+                .getUserId();
     }
 
     private PaymentTransactionResponse toResponse(PaymentTransaction tx) {

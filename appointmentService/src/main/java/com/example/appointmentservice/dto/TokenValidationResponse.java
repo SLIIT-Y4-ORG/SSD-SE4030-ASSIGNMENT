@@ -5,11 +5,10 @@ import java.util.UUID;
 import lombok.Data;
 
 @Data
-public class PatientDto {
-    private UUID id;
+public class TokenValidationResponse {
+    private boolean valid;
     private UUID userId;
-    private String firstName;
-    private String lastName;
     private String email;
-    private String phone;
+    private String role;
+    private String message;
 }

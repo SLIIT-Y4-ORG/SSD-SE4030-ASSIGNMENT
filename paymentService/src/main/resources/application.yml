@@ -33,10 +33,13 @@ spring:
 server:
   port: ${PORT:8085}
 
-# C-7 fix (CWE-306): URL of userService used by UserServiceClient for Bearer token validation.
 services:
   user:
     base-url: ${USER_SERVICE_URL:http://localhost:8081}
+  patient:
+    base-url: ${PATIENT_SERVICE_URL:http://localhost:8080}
+  appointment:
+    base-url: ${APPOINTMENT_SERVICE_URL:http://localhost:8084}
 
 stripe:
   api-key: ${STRIPE_API_KEY:}
@@ -47,7 +50,7 @@ stripe:
 
 payment:
   security:
-    internal-api-key: ${PAYMENT_INTERNAL_API_KEY}
+    internal-api-key: ${PAYMENT_INTERNAL_API_KEY:}
     internal-auth-enabled: ${PAYMENT_INTERNAL_AUTH_ENABLED:true}
 
 management:

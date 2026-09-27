@@ -19,10 +19,6 @@ public class InternalAuthService {
     }
 
     public void verifyInternalApiKey(String providedApiKey) {
-        if (!paymentSecurityProperties.internalAuthEnabled()) {
-            return;
-        }
-
         String configured = paymentSecurityProperties.internalApiKey();
         if (configured == null || configured.isBlank()) {
             throw new UnauthorizedException("Internal API key is not configured");
