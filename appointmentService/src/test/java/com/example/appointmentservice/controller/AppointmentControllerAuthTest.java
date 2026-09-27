@@ -1,4 +1,4 @@
-package com.example.appointmentservice.controller;
+ package com.example.appointmentservice.controller;
 
 import com.example.appointmentservice.client.UserServiceClient;
 import com.example.appointmentservice.client.UserServiceClient.TokenInfo;
@@ -13,7 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,8 +70,7 @@ class AppointmentControllerAuthTest {
         validRequest.setDoctorId(UUID.randomUUID());
         validRequest.setSlotId(UUID.randomUUID());
         validRequest.setReason("Checkup");
-        validRequest.setAmount(new BigDecimal("50.00"));
-        validRequest.setCurrency("USD");
+        // Note: amount and currency are no longer accepted from the client (CWE-20 fix)
     }
 
     // ── 1. Missing (null) header ───────────────────────────────────────────────
