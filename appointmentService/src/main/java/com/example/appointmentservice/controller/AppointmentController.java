@@ -11,18 +11,17 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestHeader;
 
+import com.example.appointmentservice.client.DoctorServiceClient;
+import com.example.appointmentservice.client.PatientServiceClient;
 import com.example.appointmentservice.dto.AppointmentResponse;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
-import com.example.appointmentservice.dto.RescheduleAppointmentRequest;
-import com.example.appointmentservice.service.AppointmentService;
-import com.example.appointmentservice.client.PatientServiceClient;
-import com.example.appointmentservice.client.DoctorServiceClient;
 import com.example.appointmentservice.dto.TokenValidationResponse;
 import com.example.appointmentservice.exception.ForbiddenException;
+import com.example.appointmentservice.service.AppointmentService;
 import com.example.appointmentservice.util.AuthHelper;
 import com.example.appointmentservice.util.InternalAuthService;
 
@@ -38,8 +37,10 @@ public class AppointmentController {
     private final DoctorServiceClient doctorServiceClient;
     private final InternalAuthService internalAuthService;
 
-    public AppointmentController(AppointmentService appointmentService, AuthHelper authHelper,
-            PatientServiceClient patientServiceClient, DoctorServiceClient doctorServiceClient,
+    public AppointmentController(AppointmentService appointmentService,
+            AuthHelper authHelper,
+            PatientServiceClient patientServiceClient,
+            DoctorServiceClient doctorServiceClient,
             InternalAuthService internalAuthService) {
         this.appointmentService = appointmentService;
         this.authHelper = authHelper;
@@ -59,7 +60,8 @@ public class AppointmentController {
 
     @GetMapping("/{id}")
     public ResponseEntity<AppointmentResponse> getAppointmentById(
-            @RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id) {
         AppointmentResponse appointment = appointmentService.getAppointmentById(id);
         authorizeAppointment(authHeader, appointment);
         return ResponseEntity.ok(appointment);
@@ -85,27 +87,17 @@ public class AppointmentController {
 
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<AppointmentResponse> cancelAppointment(
-            @RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id) {
         authorizeAppointment(authHeader, appointmentService.getAppointmentById(id));
         return ResponseEntity.ok(appointmentService.cancelAppointment(id));
     }
 
-    // @PatchMapping("/{id}/reschedule")
-    // public ResponseEntity<AppointmentResponse> rescheduleAppointment(
-    //         @PathVariable UUID id,
-    //         @Valid @RequestBody RescheduleAppointmentRequest request) {
-    //     return ResponseEntity.ok(appointmentService.rescheduleAppointment(id, request));
-    // }
-
-    // @GetMapping("/stats")
-    // public ResponseEntity<HashMap<String, Object>> getAppointmentStats() {
-    //     return ResponseEntity.ok(appointmentService.getAppointmentStats());
-    // }
-
     @PostMapping("/{id}/payment-session")
     public ResponseEntity<Map<String, Object>> initiatePaymentSession(
-            @RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
-        TokenValidationResponse auth = authHelper.requireRole(authHeader, "PATIENT");
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id) {
+        authHelper.requireRole(authHeader, "PATIENT");
         AppointmentResponse appointment = appointmentService.getAppointmentById(id);
         patientServiceClient.getPatientById(appointment.getPatientId(), authHeader);
         return ResponseEntity.ok(appointmentService.initiatePaymentSession(id));
@@ -124,7 +116,8 @@ public class AppointmentController {
 
     @GetMapping("/{id}/status")
     public ResponseEntity<Map<String, Object>> getAppointmentStatus(
-            @RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id) {
         authorizeAppointment(authHeader, appointmentService.getAppointmentById(id));
         return ResponseEntity.ok(appointmentService.getAppointmentStatus(id));
     }

@@ -33,6 +33,14 @@ spring:
 server:
   port: ${PORT:8085}
 
+services:
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+  patient:
+    base-url: ${PATIENT_SERVICE_URL:http://localhost:8080}
+  appointment:
+    base-url: ${APPOINTMENT_SERVICE_URL:http://localhost:8084}
+
 stripe:
   api-key: ${STRIPE_API_KEY:}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
@@ -43,15 +51,7 @@ stripe:
 payment:
   security:
     internal-api-key: ${PAYMENT_INTERNAL_API_KEY:}
-    internal-auth-enabled: true
-
-services:
-  user:
-    base-url: ${USER_SERVICE_URL:http://localhost:8081}
-  patient:
-    base-url: ${PATIENT_SERVICE_URL:http://localhost:8083}
-  appointment:
-    base-url: ${APPOINTMENT_SERVICE_URL:http://localhost:8084}
+    internal-auth-enabled: ${PAYMENT_INTERNAL_AUTH_ENABLED:true}
 
 management:
   endpoints:

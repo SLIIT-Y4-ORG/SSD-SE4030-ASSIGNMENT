@@ -3,8 +3,8 @@ package com.example.paymentservice.config;
 import com.stripe.Stripe;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
@@ -29,7 +29,7 @@ public class ApplicationConfig {
     }
 
     @Bean
-    RestTemplate restTemplate() {
+    public RestTemplate restTemplate() {
         return new RestTemplate();
     }
 }

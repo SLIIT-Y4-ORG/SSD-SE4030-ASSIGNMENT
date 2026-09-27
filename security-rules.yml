@@ -1,0 +1,40 @@
+rules:
+  - id: appointment-raw-exception-message-response
+    message: Raw exception message is returned through the Appointment Service catch-all handler.
+    severity: ERROR
+    languages:
+      - java
+    metadata:
+      cwe: CWE-209
+      owasp: A05:2021
+    paths:
+      include:
+        - appointmentService/src/main/java/**
+    pattern: return build(HttpStatus.INTERNAL_SERVER_ERROR, $EX.getMessage());
+
+  - id: appointment-downstream-exception-propagation
+    message: Downstream exception details are concatenated into another exception and may reach an HTTP response.
+    severity: WARNING
+    languages:
+      - java
+    metadata:
+      cwe: CWE-209
+      owasp: A05:2021
+    paths:
+      include:
+        - appointmentService/src/main/java/**
+    pattern: throw new $EXCEPTION(... + $ERR.getMessage(), ...);
+
+  - id: hardcoded-payment-api-key-fallback
+    message: PAYMENT_INTERNAL_API_KEY contains a hard-coded fallback credential.
+    severity: ERROR
+    languages:
+      - generic
+    metadata:
+      cwe: CWE-798
+      owasp: A07:2021
+    paths:
+      include:
+        - appointmentService/src/main/resources/**
+        - paymentService/src/main/resources/**
+    pattern-regex: '(?i)\$\{PAYMENT_INTERNAL_API_KEY:[^}\r\n]+\}'
