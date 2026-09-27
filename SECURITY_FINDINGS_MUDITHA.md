@@ -119,3 +119,59 @@ $resp = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" -Method Po
 curl.exe -i -H "Authorization: Bearer $($resp.accessToken)" http://localhost:8080/api/payments/customers/<valid-userId>
 # Expected: HTTP 200 OK (Returns sensitive Stripe data successfully to the authenticated owner)
 ```
+
+---
+
+## 3. Vulnerability 3 (C-3): Client-Controlled Payment Amount (Price Manipulation)
+
+### Vulnerability Summary
+
+| Field | Value |
+|---|---|
+| **ID** | C-3 |
+| **CWE** | CWE-20 — Improper Input Validation |
+| **OWASP** | A04:2021 – Insecure Design |
+| **Service** | `appointmentService` (`CreateAppointmentRequest.java`, `AppointmentServiceImpl.java`) |
+| **Status** | ✅ IMPLEMENTED & VERIFIED |
+
+### Affected Component
+Prior to remediation, the appointment booking endpoint (`POST /api/appointments`) trusted the client to specify the consultation fee:
+* `CreateAppointmentRequest.java` exposed `amount` and `currency` fields.
+* `AppointmentServiceImpl.java` stored this client-supplied `amount` directly into the database.
+* The subsequent Stripe checkout session generated a payment link based on this unvalidated, attacker-controlled price.
+
+### Root Cause
+The backend relied on the client to provide business-critical pricing data rather than determining the price on the server side. Because the DTO included `@NotNull` validation for `amount`, the API actively expected the client to dictate the price, which violates the principle of never trusting user input for sensitive business logic (CWE-20).
+
+### Remediation
+1. **Removed Attack Surface:** Removed the `amount` and `currency` fields from the `CreateAppointmentRequest` DTO. Unknown fields sent by older clients are silently ignored by Jackson.
+2. **Server-Side Enforcement:** Modified `AppointmentServiceImpl` to assign a strict, server-defined constant (LKR 2500.00) for all appointments, completely disregarding any client-supplied pricing data.
+3. **Frontend UI Update:** Updated `BookingForm.jsx` to make the amount and currency `<input>` fields `disabled`, preventing users from attempting to modify the price visually.
+
+### Verification Evidence
+
+**BEFORE Evidence (Live curl tests):**
+```powershell
+# Authenticated patient books appointment with manipulated amount of 0.01
+$body = '{"patientId":"bd22fcee-dee6-47a5-96e8-14649d98d398","doctorId":"<uuid>","slotId":"<uuid>","reason":"Checkup","notes":"","amount":"0.01","currency":"lkr"}'
+
+$result = Invoke-RestMethod -Uri "http://localhost:8080/api/appointments" `
+  -Method Post -ContentType "application/json" `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -Body $body
+
+# Expected BEFORE: $result.amount equals 0.01 (server blindly stored attacker price)
+```
+
+**AFTER Evidence (Live curl tests):**
+```powershell
+# Attacker attempts to inject amount=0.01
+$body1 = '{"patientId":"bd22fcee-dee6-47a5-96e8-14649d98d398","doctorId":"<uuid>","slotId":"<new-uuid>","reason":"Checkup","notes":"","amount":"0.01","currency":"lkr"}'
+
+$r1 = Invoke-RestMethod -Uri "http://localhost:8080/api/appointments" `
+  -Method Post -ContentType "application/json" `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -Body $body1
+
+# Expected AFTER: $r1.amount == 2500.00 (attacker input completely ignored)
+```

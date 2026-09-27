@@ -90,8 +90,11 @@ public class AppointmentServiceImpl implements AppointmentService {
 
         appointment.setStatus(AppointmentStatus.PENDING);
         appointment.setPaymentStatus(PaymentStatus.NOT_INITIATED);
-        appointment.setAmount(request.getAmount());
-        appointment.setCurrency(request.getCurrency());
+        // CWE-20 fix: amount and currency are now server-defined constants.
+        // Previously these came from the client request, allowing a patient
+        // to submit amount=0.01 and pay a fraction of the actual fee.
+        appointment.setAmount(new java.math.BigDecimal("2500.00"));
+        appointment.setCurrency("lkr");
 
         // appointment.setStatus(AppointmentStatus.CONFIRMED);
         appointment.setReason(request.getReason());

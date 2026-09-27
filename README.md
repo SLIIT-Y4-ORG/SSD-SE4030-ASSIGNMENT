@@ -9,7 +9,7 @@ This repository contains the security-hardened **ClinicMate** healthcare microse
 | Member Name | Student ID | Assigned Vulnerabilities / Contributions | Branch |
 | :--- | :--- | :--- | :--- |
 | **K.L. Widanagama** | IT22629562 | **Vulnerability 1:** Appointment Service exposed raw downstream exception messages containing internal service URLs, ports and technical details.<br> **Vulnerability 2:** The internal API key used between Appointment Service and Payment Service was stored as a tracked/default credential.<br> | `kusalya_1` |
-| **S.M.D.M. Bandara** | IT22141842 | **Vulnerability 1:** Unauthenticated Access to All Appointment Endpoints (CWE-306)<br>**Vulnerability 2:** Unauthenticated Access to Payment Profile and Transaction History (CWE-306) | `feature/muditha` |
+| **S.M.D.M. Bandara** | IT22141842 | **Vulnerability 1:** Unauthenticated Access to All Appointment Endpoints (CWE-306)<br>**Vulnerability 2:** Unauthenticated Access to Payment Profile and Transaction History (CWE-306)<br>**Vulnerability 3:** Client-Controlled Payment Amount (Price Manipulation) (CWE-20) | `feature/muditha` |
 | **Wijesinghe L P P** | **IT22555380** | **Vulnerability 1:** Content Security Policy (CSP) Header Not Set (CWE-693)<br>**Vulnerability 2:** Missing Anti-Clickjacking Header (X-Frame-Options / frame-ancestors) (CWE-1021)<br>**Feature:** Federated Authentication via Google Sign-In (OAuth 2.0 / OIDC Authorization Code Grant) | `feature/panduka` |
 | **Darshan R** | **IT22097156** | **Finding 1:** Insecure Password Storage & Predictable Auth Tokens (CWE-256, CWE-287)<br>**Finding 2:** Broken Access Control & Privilege Escalation (CWE-269, CWE-639) | `feature/rd927` |
 

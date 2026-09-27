@@ -1,6 +1,5 @@
 package com.example.appointmentservice.service;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -67,8 +66,7 @@ class AppointmentServiceImplSecurityTest {
         validRequest.setDoctorId(UUID.randomUUID());
         validRequest.setSlotId(UUID.randomUUID());
         validRequest.setReason("Checkup");
-        validRequest.setAmount(new BigDecimal("100.00"));
-        validRequest.setCurrency("USD");
+        // Note: amount and currency are no longer accepted from the client (CWE-20 fix)
 
         when(appointmentRepository.existsBySlotIdAndStatus(any(), any())).thenReturn(false);
     }
