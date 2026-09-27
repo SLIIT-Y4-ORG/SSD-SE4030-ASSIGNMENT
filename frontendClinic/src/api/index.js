@@ -312,15 +312,6 @@ export async function confirmCheckoutSession(sessionId) {
     return res.data
 }
 
-export async function notifyAppointmentPayment(appointmentId, paymentStatus, transactionId = null) {
-    const res = await axios.post(
-        `${API_GATEWAY}/api/appointments/payment-callback`,
-        { appointmentId, paymentStatus, transactionId },
-        { headers: authHeaders() }
-    )
-    return res.data
-}
-
 // ── Patient helpers ───────────────────────────────────────────────────────
 export async function createPatientProfile(data) {
     const res = await axios.post(`${API_GATEWAY}/api/patients`, data, {

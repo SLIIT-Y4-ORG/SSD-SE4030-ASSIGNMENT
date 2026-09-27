@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(ExternalServiceException.class)
     public ResponseEntity<Map<String, Object>> handleExternal(ExternalServiceException ex) {
         return build(HttpStatus.BAD_GATEWAY, ex.getMessage());

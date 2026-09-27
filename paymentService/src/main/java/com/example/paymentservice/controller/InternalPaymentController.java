@@ -34,8 +34,10 @@ public class InternalPaymentController {
 
     @PostMapping("/customers")
     public ResponseEntity<PaymentProfileResponse> provisionCustomer(
+            @RequestHeader("X-Internal-Api-Key") String internalApiKey,
             @Valid @RequestBody ProvisionCustomerRequest request
     ) {
+        internalAuthService.verifyInternalApiKey(internalApiKey);
         PaymentProfileResponse response = paymentProfileService.provisionStripeCustomer(request);
         HttpStatus status = response.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(response);

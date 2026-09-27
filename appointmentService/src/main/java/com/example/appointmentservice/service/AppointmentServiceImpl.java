@@ -39,7 +39,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
-    public AppointmentResponse createAppointment(CreateAppointmentRequest request) {
+    public AppointmentResponse createAppointment(CreateAppointmentRequest request, String authHeader) {
         validateCreateRequest(request);
 
         if (appointmentRepository.existsBySlotIdAndStatus(request.getSlotId(), AppointmentStatus.CONFIRMED)) {
@@ -48,7 +48,7 @@ public class AppointmentServiceImpl implements AppointmentService {
 
         // Validate patient & doctor exist in their respective services
         try {
-            var patient = patientServiceClient.getPatientById(request.getPatientId());
+            var patient = patientServiceClient.getPatientById(request.getPatientId(), authHeader);
             if (patient == null) {
                 throw new ResourceNotFoundException("Patient not found: " + request.getPatientId());
             }
@@ -57,7 +57,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
 
         try {
-            var doctor = doctorServiceClient.getDoctorById(request.getDoctorId());
+            var doctor = doctorServiceClient.getDoctorById(request.getDoctorId(), authHeader);
             if (doctor == null) {
                 throw new ResourceNotFoundException("Doctor not found: " + request.getDoctorId());
             }
@@ -102,6 +102,18 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .stream()
                 .map(AppointmentMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public List<AppointmentResponse> getAppointmentsForPatient(UUID patientId) {
+        return appointmentRepository.findByPatientId(patientId).stream()
+                .map(AppointmentMapper::toResponse).toList();
+    }
+
+    @Override
+    public List<AppointmentResponse> getAppointmentsForDoctor(UUID doctorId) {
+        return appointmentRepository.findByDoctorId(doctorId).stream()
+                .map(AppointmentMapper::toResponse).toList();
     }
 
     @Override

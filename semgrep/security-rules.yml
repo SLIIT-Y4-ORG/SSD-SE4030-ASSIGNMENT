@@ -1,0 +1,286 @@
+rules:
+  - id: plaintext-password-comparison
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Passwords are compared directly, indicating plaintext or reversibly stored
+      credentials. Verify passwords with a slow salted password-hashing function.
+    metadata:
+      vulnerability: Insecure password storage
+      cwe: CWE-256
+      owasp: A07:2021 Identification and Authentication Failures
+    pattern: $REQUEST.getPassword().equals($USER.getPassword())
+
+  - id: predictable-uuid-access-token
+    languages: [java]
+    severity: ERROR
+    message: >-
+      An access token is deterministically constructed from a user UUID and can
+      be forged without authenticating. Use signed, random, expiring tokens.
+    metadata:
+      vulnerability: Forgeable authentication token
+      cwe: CWE-330
+      owasp: A07:2021 Identification and Authentication Failures
+    pattern: '"token_" + $USER.getId().toString()'
+
+  - id: public-registration-preserves-client-role
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Public registration persists a request-bound User without forcing a safe
+      server-side role, allowing client-controlled privilege assignment.
+    metadata:
+      vulnerability: Registration privilege escalation
+      cwe: CWE-915
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern: |
+          public User registerUser(User $USER) {
+            ...
+            return $REPO.save($USER);
+          }
+      - pattern-not: |
+          public User registerUser(User $USER) {
+            ...
+            $USER.setRole(UserRole.PATIENT);
+            ...
+            return $REPO.save($USER);
+          }
+
+  - id: user-role-mass-assignment
+    languages: [java]
+    severity: ERROR
+    message: >-
+      A role is copied from a request-bound user into the persisted account,
+      allowing an ordinary profile update to change privileges.
+    metadata:
+      vulnerability: Role mass assignment
+      cwe: CWE-915
+      owasp: A01:2021 Broken Access Control
+    pattern: $USER.setRole($UPDATED_USER.getRole())
+
+  - id: unauthenticated-user-management-endpoint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      A sensitive user-management endpoint has no authentication input or
+      authorization guard, exposing user records to unauthenticated callers.
+    metadata:
+      vulnerability: Missing endpoint authorization
+      cwe: CWE-862
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/users")
+          class $CONTROLLER {
+            ...
+          }
+      - pattern-either:
+          - pattern: |
+              @GetMapping
+              public ResponseEntity<List<User>> getAllUsers() {
+                ...
+              }
+          - pattern: |
+              @GetMapping("/{id}")
+              public ResponseEntity<User> getUserById(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @PutMapping("/{id}")
+              public ResponseEntity<User> updateUser(@PathVariable UUID $ID, @RequestBody User $USER) {
+                ...
+              }
+          - pattern: |
+              @DeleteMapping("/{id}")
+              public ResponseEntity<Void> deleteUser(@PathVariable UUID $ID) {
+                ...
+              }
+
+  - id: patient-record-read-without-object-authorization
+    languages: [java]
+    severity: ERROR
+    message: >-
+      The patient lookup verifies only that the caller is authenticated and
+      does not verify record ownership or an authorized staff role. This permits IDOR.
+    metadata:
+      vulnerability: Patient record IDOR
+      cwe: CWE-639
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/patients")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern: |
+          @GetMapping("/{id}")
+          public ResponseEntity<Patient> $METHOD(
+                  @RequestHeader("Authorization") String $AUTH,
+                  @PathVariable UUID $ID) {
+              $HELPER.requireAuthenticated($AUTH);
+              return ResponseEntity.ok($SERVICE.getPatientById($ID));
+          }
+
+  - id: unauthenticated-appointment-endpoint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      An appointment endpoint accepts an object identifier or request data
+      without authentication and object-level authorization.
+    metadata:
+      vulnerability: Unauthenticated appointment access and IDOR
+      cwe: CWE-862
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/appointments")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern-either:
+          - pattern: |
+              @PostMapping
+              public ResponseEntity<AppointmentResponse> $METHOD(
+                      @Valid @RequestBody CreateAppointmentRequest $REQUEST) {
+                ...
+              }
+          - pattern: |
+              @GetMapping("/{id}")
+              public ResponseEntity<AppointmentResponse> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @GetMapping
+              public ResponseEntity<List<AppointmentResponse>> $METHOD() {
+                ...
+              }
+          - pattern: |
+              @PatchMapping("/{id}/cancel")
+              public ResponseEntity<AppointmentResponse> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @PostMapping("/{id}/payment-session")
+              public ResponseEntity<Map<String, Object>> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @GetMapping("/{id}/status")
+              public ResponseEntity<Map<String, Object>> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+
+  - id: unauthenticated-payment-object-access
+    languages: [java]
+    severity: ERROR
+    message: >-
+      A payment endpoint trusts a caller-supplied patient or session identifier
+      without authenticating the caller and enforcing ownership.
+    metadata:
+      vulnerability: Payment record IDOR
+      cwe: CWE-639
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/payments")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern-either:
+          - pattern: |
+              @GetMapping("/customers/{userId}")
+              public ResponseEntity<PaymentProfileResponse> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @PostMapping("/checkout-session")
+              public ResponseEntity<CreateCheckoutSessionResponse> $METHOD(
+                      @Valid @RequestBody CreateCheckoutSessionRequest $REQUEST) {
+                ...
+              }
+          - pattern: |
+              @GetMapping("/users/{userId}/transactions")
+              public ResponseEntity<List<PaymentTransactionResponse>> $METHOD(@PathVariable UUID $ID) {
+                ...
+              }
+          - pattern: |
+              @PostMapping("/checkout-session/{sessionId}/confirm")
+              public ResponseEntity<PaymentTransactionResponse> $METHOD(@PathVariable String $ID) {
+                ...
+              }
+
+  - id: unprotected-internal-payment-customer-provisioning
+    languages: [java]
+    severity: ERROR
+    message: >-
+      The internal customer-provisioning endpoint does not require and verify
+      the service-to-service API key.
+    metadata:
+      vulnerability: Missing authentication on internal endpoint
+      cwe: CWE-306
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/internal/payments")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern: |
+          @PostMapping("/customers")
+          public ResponseEntity<PaymentProfileResponse> $METHOD(
+                  @Valid @RequestBody ProvisionCustomerRequest $REQUEST) {
+            ...
+          }
+
+  - id: unprotected-appointment-payment-callback
+    languages: [java]
+    severity: ERROR
+    message: >-
+      The appointment payment callback accepts status changes without
+      authenticating the calling payment service.
+    metadata:
+      vulnerability: Unauthenticated payment-status modification
+      cwe: CWE-306
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/appointments")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern: |
+          @PostMapping("/payment-callback")
+          public ResponseEntity<Map<String, String>> $METHOD(@RequestBody Map<String, Object> $PAYLOAD) {
+            ...
+          }
+
+  - id: pending-doctor-record-visible-to-any-authenticated-user
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Direct doctor lookup requires authentication but does not restrict an
+      unverified application to its owner or authorized staff.
+    metadata:
+      vulnerability: Pending doctor application IDOR
+      cwe: CWE-639
+      owasp: A01:2021 Broken Access Control
+    patterns:
+      - pattern-inside: |
+          @RestController
+          @RequestMapping("/api/doctors")
+          public class $CONTROLLER {
+            ...
+          }
+      - pattern: |
+          @GetMapping("/{id}")
+          public ResponseEntity<Doctor> $METHOD(@RequestHeader("Authorization") String $AUTH, @PathVariable UUID $ID) {
+              $HELPER.requireAuthenticated($AUTH);
+              return ResponseEntity.ok($SERVICE.getDoctorById($ID));
+          }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { confirmCheckoutSession, notifyAppointmentPayment } from '../api'
+import { confirmCheckoutSession } from '../api'
 import { useToast } from '../components/Toast'
 
 export default function PaymentSuccessPage() {
@@ -20,12 +20,8 @@ export default function PaymentSuccessPage() {
         }
 
         confirmCheckoutSession(sessionId)
-            .then(async (transaction) => {
+            .then((transaction) => {
                 setTx(transaction)
-
-                if (transaction?.appointmentId && transaction?.status === 'COMPLETED') {
-                    await notifyAppointmentPayment(transaction.appointmentId, 'success', transaction.id)
-                }
             })
             .catch(err => {
                 const msg = err?.response?.data?.message || 'Failed to confirm payment status'
