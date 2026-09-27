@@ -26,13 +26,13 @@ public class PatientController {
 
     /**
      * Create a new patient profile (linked to the authenticated user).
-     * Any authenticated user can create their own patient profile.
+     * Patients can create their own profile. Identity is always taken from the token.
      */
     @PostMapping
     public ResponseEntity<Patient> createPatient(
             @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody Patient patient) {
-        TokenValidationResponse auth = authHelper.requireAuthenticated(authHeader);
+        TokenValidationResponse auth = authHelper.requireRole(authHeader, "PATIENT");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(patientService.createPatient(patient, auth.getUserId()));
     }
@@ -58,14 +58,16 @@ public class PatientController {
     }
 
     /**
-     * Get a patient by ID.
+     * Get a patient by ID. Restricted to the owner or authorized staff.
      */
     @GetMapping("/{id}")
     public ResponseEntity<Patient> getPatientById(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID id) {
-        authHelper.requireAuthenticated(authHeader);
-        return ResponseEntity.ok(patientService.getPatientById(id));
+        TokenValidationResponse auth = authHelper.requireAuthenticated(authHeader);
+        Patient patient = patientService.getPatientById(id);
+        requireOwnerOrStaff(auth, patient);
+        return ResponseEntity.ok(patient);
     }
 
     /**
@@ -79,11 +81,16 @@ public class PatientController {
         TokenValidationResponse auth = authHelper.requireAuthenticated(authHeader);
         // Allow self-update or admin/receptionist
         Patient existing = patientService.getPatientById(id);
-        if (!existing.getUserId().equals(auth.getUserId())
-                && !"ADMIN".equals(auth.getRole())
-                && !"RECEPTIONIST".equals(auth.getRole())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        requireOwnerOrStaff(auth, existing);
         return ResponseEntity.ok(patientService.updatePatient(id, patient));
+    }
+
+    private void requireOwnerOrStaff(TokenValidationResponse auth, Patient patient) {
+        boolean owner = patient.getUserId() != null && patient.getUserId().equals(auth.getUserId());
+        boolean staff = "ADMIN".equals(auth.getRole()) || "RECEPTIONIST".equals(auth.getRole());
+        if (!owner && !staff) {
+            throw new com.example.patientservice.exception.ForbiddenException(
+                    "You may only access your own patient profile");
+        }
     }
 }

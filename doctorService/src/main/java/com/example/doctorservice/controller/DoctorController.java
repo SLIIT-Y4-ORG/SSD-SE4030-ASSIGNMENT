@@ -110,8 +110,15 @@ public class DoctorController {
     // getDoctorById
     @GetMapping("/{id}")
     public ResponseEntity<Doctor> getDoctorById(@RequestHeader("Authorization") String authHeader, @PathVariable UUID id) {
-        authHelper.requireAuthenticated(authHeader);
-        return ResponseEntity.ok(doctorService.getDoctorById(id));
+        TokenValidationResponse caller = authHelper.requireAuthenticated(authHeader);
+        Doctor doctor = doctorService.getDoctorById(id);
+        boolean publicProfile = doctor.isVerified() && doctor.isActive();
+        boolean owner = doctor.getUserId() != null && doctor.getUserId().equals(caller.getUserId());
+        boolean staff = "ADMIN".equals(caller.getRole()) || "RECEPTIONIST".equals(caller.getRole());
+        if (!publicProfile && !owner && !staff) {
+            throw new ForbiddenException("Pending doctor applications are private");
+        }
+        return ResponseEntity.ok(doctor);
     }
 
     // post
