@@ -33,6 +33,11 @@ spring:
 server:
   port: ${PORT:8085}
 
+# C-7 fix (CWE-306): URL of userService used by UserServiceClient for Bearer token validation.
+services:
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+
 stripe:
   api-key: ${STRIPE_API_KEY:}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

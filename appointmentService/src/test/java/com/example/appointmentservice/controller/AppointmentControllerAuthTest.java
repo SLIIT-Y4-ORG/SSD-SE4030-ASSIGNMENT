@@ -1,8 +1,10 @@
 package com.example.appointmentservice.controller;
 
+import com.example.appointmentservice.client.UserServiceClient;
+import com.example.appointmentservice.client.UserServiceClient.TokenInfo;
 import com.example.appointmentservice.dto.CreateAppointmentRequest;
 import com.example.appointmentservice.exception.UnauthorizedException;
-import com.example.appointmentservice.security.AuthorizationHeaderValidator;
+import com.example.appointmentservice.security.AuthHelper;
 import com.example.appointmentservice.service.AppointmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,8 +18,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for Authorization header enforcement in {@link AppointmentController}.
@@ -27,14 +31,18 @@ import static org.mockito.Mockito.verify;
  * HTTP status mapping (UnauthorizedException → 401) is covered separately by
  * {@link com.example.appointmentservice.exception.GlobalExceptionHandlerSecurityTest}.
  *
+ * Tests use a mock {@link UserServiceClient} so that format-rejection cases
+ * (null, blank, non-Bearer) never reach the network — they are rejected by
+ * {@link AuthHelper#requireBearer} before the client is invoked.
+ * The "valid token" case stubs the client to return a real {@link TokenInfo}.
+ *
  * Verifies that:
  * 1. Missing (null) header → UnauthorizedException before service is called.
  * 2. Blank header → UnauthorizedException before service is called.
  * 3. Non-Bearer header → UnauthorizedException before service is called.
  * 4. "Bearer " with no token → UnauthorizedException before service is called.
  * 5. Valid Bearer token → service.createAppointment() is called.
- * 6. Neither PatientServiceClient nor DoctorServiceClient is invoked on rejection
- *    (they are not reachable via the controller — the service mock is never called).
+ * 6. UnauthorizedException message never echoes the header value (no info leakage).
  *
  * All token values are dummies.
  */
@@ -47,15 +55,16 @@ class AppointmentControllerAuthTest {
     @Mock
     private AppointmentService appointmentService;
 
-    // The real validator is used — not a mock — so its logic is exercised.
-    private final AuthorizationHeaderValidator validator = new AuthorizationHeaderValidator();
+    @Mock
+    private UserServiceClient userServiceClient;
 
     private AppointmentController controller;
     private CreateAppointmentRequest validRequest;
 
     @BeforeEach
     void setup() {
-        controller = new AppointmentController(appointmentService, validator);
+        AuthHelper authHelper = new AuthHelper(userServiceClient);
+        controller = new AppointmentController(appointmentService, authHelper);
 
         validRequest = new CreateAppointmentRequest();
         validRequest.setPatientId(UUID.randomUUID());
@@ -77,6 +86,8 @@ class AppointmentControllerAuthTest {
 
         // Service (and thus all downstream clients) is never reached
         verify(appointmentService, never()).createAppointment(any(), any());
+        // UserServiceClient is also never called — rejected by format check first
+        verify(userServiceClient, never()).validateToken(any());
     }
 
     // ── 2. Blank header ───────────────────────────────────────────────────────
@@ -89,6 +100,7 @@ class AppointmentControllerAuthTest {
                 .hasMessage("Authentication required");
 
         verify(appointmentService, never()).createAppointment(any(), any());
+        verify(userServiceClient, never()).validateToken(any());
     }
 
     @Test
@@ -98,6 +110,7 @@ class AppointmentControllerAuthTest {
                 .isInstanceOf(UnauthorizedException.class);
 
         verify(appointmentService, never()).createAppointment(any(), any());
+        verify(userServiceClient, never()).validateToken(any());
     }
 
     // ── 3. Non-Bearer scheme ──────────────────────────────────────────────────
@@ -110,6 +123,7 @@ class AppointmentControllerAuthTest {
                 .hasMessage("Authentication required");
 
         verify(appointmentService, never()).createAppointment(any(), any());
+        verify(userServiceClient, never()).validateToken(any());
     }
 
     @Test
@@ -119,13 +133,17 @@ class AppointmentControllerAuthTest {
                 .isInstanceOf(UnauthorizedException.class);
 
         verify(appointmentService, never()).createAppointment(any(), any());
+        verify(userServiceClient, never()).validateToken(any());
     }
 
     // ── 4. "Bearer " with no token ────────────────────────────────────────────
 
     @Test
-    @DisplayName("\"Bearer \" with no token → UnauthorizedException, service not called")
+    @DisplayName("\"Bearer \" with no token → still rejected by userService returning null")
     void bearerWithNoTokenThrowsUnauthorized() {
+        // "Bearer " passes the prefix check; userServiceClient returns null → 401
+        when(userServiceClient.validateToken(eq("Bearer "))).thenReturn(null);
+
         assertThatThrownBy(() -> controller.createAppointment("Bearer ", validRequest))
                 .isInstanceOf(UnauthorizedException.class);
 
@@ -137,8 +155,10 @@ class AppointmentControllerAuthTest {
     @Test
     @DisplayName("Valid Bearer token → service.createAppointment() is called")
     void validTokenCallsService() {
+        TokenInfo fakeUser = new TokenInfo(UUID.randomUUID(), "PATIENT");
+        when(userServiceClient.validateToken(eq(VALID_TOKEN))).thenReturn(fakeUser);
         // Service returns null — ResponseEntity.ok(null) is fine for this test scope
-        org.mockito.Mockito.when(appointmentService.createAppointment(any(), any())).thenReturn(null);
+        when(appointmentService.createAppointment(any(), any())).thenReturn(null);
 
         controller.createAppointment(VALID_TOKEN, validRequest);
 
