@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
 import { getGoogleAuthUrl } from '../api'
+import { generateSecureState } from '../utils/oauth'
 
 export default function RegisterPage() {
     const { register } = useAuth()
@@ -24,7 +25,7 @@ export default function RegisterPage() {
         try {
             setGoogleLoading(true)
             setError('')
-            const state = Math.random().toString(36).substring(2) + Date.now().toString(36)
+            const state = generateSecureState()
             sessionStorage.setItem('oauth_state', state)
             const redirectUri = window.location.origin + '/auth/callback'
             const authUrl = await getGoogleAuthUrl(state, redirectUri)
