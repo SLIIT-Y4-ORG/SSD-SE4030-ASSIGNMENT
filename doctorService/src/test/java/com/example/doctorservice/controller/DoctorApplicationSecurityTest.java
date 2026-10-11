@@ -94,4 +94,16 @@ class DoctorApplicationSecurityTest {
 
         verify(doctors, never()).createSlots(any(), any());
     }
+
+    @Test
+    void unrelatedPatientCannotReadPendingDoctorApplication() {
+        UUID doctorId = UUID.randomUUID();
+        when(auth.requireAuthenticated("Bearer patient-token")).thenReturn(
+                TokenValidationResponse.builder().valid(true).userId(UUID.randomUUID()).role("PATIENT").build());
+        when(doctors.getDoctorById(doctorId)).thenReturn(Doctor.builder()
+                .id(doctorId).userId(UUID.randomUUID()).verified(false).isActive(false).build());
+
+        assertThrows(ForbiddenException.class,
+                () -> controller.getDoctorById("Bearer patient-token", doctorId));
+    }
 }

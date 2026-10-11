@@ -26,24 +26,37 @@ public class InternalPaymentController {
     private final InternalAuthService internalAuthService;
     private final CheckoutService checkoutService;
 
-    public InternalPaymentController(PaymentProfileService paymentProfileService, InternalAuthService internalAuthService, CheckoutService checkoutService) {
+    public InternalPaymentController(PaymentProfileService paymentProfileService,
+                                     InternalAuthService internalAuthService,
+                                     CheckoutService checkoutService) {
         this.paymentProfileService = paymentProfileService;
         this.internalAuthService = internalAuthService;
         this.checkoutService = checkoutService;
     }
 
+    /**
+     * V-04 fix: Protected with internal API key verification.
+     * required=false so a missing header reaches InternalAuthService and returns
+     * HTTP 401 rather than Spring returning HTTP 400 before the method executes.
+     */
     @PostMapping("/customers")
     public ResponseEntity<PaymentProfileResponse> provisionCustomer(
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String internalApiKey,
             @Valid @RequestBody ProvisionCustomerRequest request
     ) {
+        internalAuthService.verifyInternalApiKey(internalApiKey);
         PaymentProfileResponse response = paymentProfileService.provisionStripeCustomer(request);
         HttpStatus status = response.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(response);
     }
 
+    /**
+     * V-04 fix: required=false so a missing header reaches InternalAuthService
+     * and returns HTTP 401 rather than Spring returning HTTP 400.
+     */
     @PostMapping("/sessions")
     public ResponseEntity<CreateCheckoutSessionResponse> createPaymentSession(
-            @RequestHeader("X-Internal-Api-Key") String internalApiKey,
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String internalApiKey,
             @Valid @RequestBody InternalCreatePaymentSessionRequest request
     ) {
         internalAuthService.verifyInternalApiKey(internalApiKey);
@@ -59,7 +72,7 @@ public class InternalPaymentController {
                     "PATIENT"
             ));
         }
-        
+
         // Create checkout session with patient's appointment details
         CreateCheckoutSessionRequest checkoutRequest = new CreateCheckoutSessionRequest(
                 request.patientId(),
@@ -68,7 +81,7 @@ public class InternalPaymentController {
             request.currency() != null ? request.currency() : "USD",
             request.appointmentId()
         );
-        
+
         CreateCheckoutSessionResponse response = checkoutService.createCheckoutSession(checkoutRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

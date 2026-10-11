@@ -36,6 +36,8 @@ nbdist/
 # Node / frontend builds
 node_modules/
 dist/
+tmp/
+output/
 
 # Environment files
 .env
@@ -46,3 +48,6 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+#SonarQube scanner cache
+.scannerwork

@@ -33,9 +33,9 @@ export default function OAuthCallbackPage() {
             return
         }
 
-        // Verify CSRF state token against sessionStorage if present
+        // Require the returned CSRF state token to match the stored login request.
         const savedState = sessionStorage.getItem('oauth_state')
-        if (savedState && state && savedState !== state) {
+        if (!savedState || !state || savedState !== state) {
             setProcessing(false)
             setError('Security validation failed: state parameter mismatch. Please try signing in again.')
             sessionStorage.removeItem('oauth_state')
