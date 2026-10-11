@@ -9,11 +9,15 @@ import com.example.appointmentservice.dto.CreateAppointmentRequest;
 
 public interface AppointmentService {
 
-    AppointmentResponse createAppointment(CreateAppointmentRequest request);
+    AppointmentResponse createAppointment(CreateAppointmentRequest request, String authHeader);
 
     AppointmentResponse getAppointmentById(UUID id);
 
     List<AppointmentResponse> getAllAppointments();
+
+    List<AppointmentResponse> getAppointmentsForPatient(UUID patientId);
+
+    List<AppointmentResponse> getAppointmentsForDoctor(UUID doctorId);
 
     AppointmentResponse cancelAppointment(UUID id);
 

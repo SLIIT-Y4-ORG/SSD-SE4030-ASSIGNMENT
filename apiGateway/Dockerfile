@@ -14,17 +14,19 @@ COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
 # Copy source code
-COPY src src
+COPY src ./src
 
 # Build the application
 RUN mvn clean package -DskipTests -B
 
-# Give the non-root user ownership of the application directory
-RUN chown -R appuser:appgroup /app
 
-# Run the application as a non-root user
-USER appuser
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
 
-# Run the application with proper JVM settings for Cloud Run
+WORKDIR /app
+
+# Copy the built application from the build stage
+COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8080
 CMD ["sh", "-c", "java -server -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -Dspring.jmx.enabled=false -Djava.security.egd=file:/dev/./urandom -Dserver.address=0.0.0.0 -Dserver.port=${PORT:-8080} -jar target/*.jar"]

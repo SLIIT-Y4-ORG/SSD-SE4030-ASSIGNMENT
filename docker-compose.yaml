@@ -70,6 +70,9 @@ services:
       - 8.8.8.8
     environment:
       PORT: 8080
+      USER_SERVICE_URL: http://user-service:8081
+      PATIENT_SERVICE_URL: http://patient-service:8080
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8084
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 2
       SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 0
 

@@ -161,6 +161,7 @@ export default function BookingForm({ initialDoctorId = '', initialSlotId = '' }
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     required
+                    disabled
                 />
             </div>
             <div className="form-group">
@@ -170,6 +171,7 @@ export default function BookingForm({ initialDoctorId = '', initialSlotId = '' }
                     value={currency}
                     onChange={e => setCurrency(e.target.value)}
                     required
+                    disabled
                 />
             </div>
             {error && <div className="alert alert-error">{error}</div>}

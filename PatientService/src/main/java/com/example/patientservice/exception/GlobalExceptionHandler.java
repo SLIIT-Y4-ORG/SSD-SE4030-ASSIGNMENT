@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -29,6 +30,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    /**
+     * Token-propagation fix: MissingRequestHeaderException is thrown by Spring
+     * when a required @RequestHeader is absent. For Authorization headers this
+     * must return HTTP 401, not HTTP 500. The static message is safe to expose.
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingHeader(MissingRequestHeaderException ex) {
+        if ("Authorization".equalsIgnoreCase(ex.getHeaderName())) {
+            return buildResponse(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return buildResponse(HttpStatus.BAD_REQUEST, "Required request header is missing");
     }
 
     @ExceptionHandler(Exception.class)
