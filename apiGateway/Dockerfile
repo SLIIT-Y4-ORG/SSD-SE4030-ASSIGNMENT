@@ -1,27 +1,23 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM maven:3.9.6-eclipse-temurin-17-alpine
 
 WORKDIR /app
 
 # Create a non-root user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy the Maven wrapper and pom.xml first for better caching
-COPY .mvn .mvn
-COPY mvnw .
-COPY mvnw.cmd .
+# Copy pom.xml first for better dependency caching
 COPY pom.xml .
 
-# Make Maven wrapper executable
-RUN chmod +x ./mvnw
+
 
 # Download dependencies
-RUN ./mvnw dependency:go-offline -B
+RUN mvn dependency:go-offline -B
 
 # Copy source code
 COPY src src
 
 # Build the application
-RUN ./mvnw clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B
 
 # Give the non-root user ownership of the application directory
 RUN chown -R appuser:appgroup /app
